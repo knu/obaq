@@ -1,0 +1,29 @@
+formulas:
+  title: file.asLink(title)
+  updated: updated.replace(/T(.+)\+/, " $1")
+  created: created.replace(/T(.+)\+/, " $1")
+properties:
+  formula.title:
+    displayName: Title
+  formula.updated:
+    displayName: Updated
+  formula.created:
+    displayName: Created
+views:
+  - type: table
+    name: Table
+    filters:
+      and:
+        - file.folder == "ChatGPT"
+        - file.name != file.folder
+    order:
+      - formula.title
+      - formula.updated
+      - formula.created
+    sort:
+      - property: formula.updated
+        direction: DESC
+    columnSize:
+      formula.title: 286
+      formula.updated: 146
+      note.created: 198
