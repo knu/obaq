@@ -1,0 +1,37 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+  ],
+  schedule: [
+    "before 6am on Monday",
+  ],
+  dependencyDashboard: true,
+  labels: ["dependencies"],
+  packageRules: [
+    {
+      matchManagers: ["npm"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "npm dependencies (non-major)",
+    },
+    {
+      matchManagers: ["npm"],
+      matchDepTypes: ["devDependencies"],
+      matchUpdateTypes: ["major"],
+      groupName: "npm dev dependencies (major)",
+    },
+    {
+      matchManagers: ["npm"],
+      matchDepTypes: ["dependencies"],
+      matchUpdateTypes: ["major"],
+      enabled: true,
+    },
+  ],
+  vulnerabilityAlerts: {
+    enabled: true,
+    labels: ["security"],
+  },
+  npm: {
+    minimumReleaseAge: "3 days",
+  },
+}
