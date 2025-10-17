@@ -1,0 +1,38 @@
+{
+  "name": "obsidian-base",
+  "version": "1.0.0",
+  "description": "CLI query processor for Obsidian Bases",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "obsidian-base": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "format": "prettier --write 'src/**/*.ts' 'test-vault/**/*.base'",
+    "lint": "eslint src --ext .ts",
+    "test": "npm run build && node --test $(find dist -name '*.test.js')",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "obsidian",
+    "query",
+    "cli"
+  ],
+  "author": "Akinori Musha <knu@idaemons.org>",
+  "license": "BSD-2-Clause",
+  "dependencies": {
+    "csv-stringify": "^6.6.0",
+    "dayjs": "^1.11.18",
+    "gray-matter": "^4.0.3",
+    "js-yaml": "^4.1.0",
+    "markdown-table": "^3.0.4"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.8.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}

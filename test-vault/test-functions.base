@@ -1,0 +1,31 @@
+formulas:
+  title: file.asLink(title)
+  updated_formatted: date(updated).format("YYYY-MM-DD")
+  updated_relative: date(updated).relative()
+  title_upper: title.title()
+  now_value: now().format("YYYY-MM-DD HH:mm")
+properties:
+  formula.title:
+    displayName: Title
+  formula.updated_formatted:
+    displayName: Updated (Formatted)
+  formula.updated_relative:
+    displayName: Updated (Relative)
+  formula.title_upper:
+    displayName: Title Case
+  formula.now_value:
+    displayName: Current Time
+views:
+  - type: table
+    filters:
+      and:
+        - file.folder == "ChatGPT"
+        - file.name != file.folder
+    order:
+      - formula.title
+      - formula.updated_formatted
+      - formula.updated_relative
+      - formula.title_upper
+    sort:
+      - property: formula.updated_formatted
+        direction: DESC
