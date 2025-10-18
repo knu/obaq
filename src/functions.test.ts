@@ -6,6 +6,7 @@ import {
   numberExtensions,
   arrayExtensions,
   dateExtensions,
+  Link,
 } from "./functions.js";
 
 describe("globalFunctions", () => {
@@ -24,11 +25,15 @@ describe("globalFunctions", () => {
   });
 
   it("link() should create basic link", () => {
-    assert.strictEqual(globalFunctions.link("path"), "[[path]]");
+    const result = globalFunctions.link("path");
+    assert.ok(result instanceof Link);
+    assert.strictEqual(result.toString(), "[[path]]");
   });
 
   it("link() should create link with display text", () => {
-    assert.strictEqual(globalFunctions.link("path", "text"), "[[path|text]]");
+    const result = globalFunctions.link("path", "text");
+    assert.ok(result instanceof Link);
+    assert.strictEqual(result.toString(), "[[path|text]]");
   });
 
   it("list() should wrap non-array in array", () => {

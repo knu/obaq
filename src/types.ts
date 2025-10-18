@@ -28,6 +28,8 @@ export interface SortConfig {
   direction: "ASC" | "DESC";
 }
 
+import type { Link } from "./functions.js";
+
 export interface ObsidianFile {
   file: {
     name: string;
@@ -39,9 +41,12 @@ export interface ObsidianFile {
     mtime: Date;
     properties: Record<string, unknown>;
     tags: string[];
-    asLink: (title?: string) => string;
-    hasTag: (...tags: string[]) => boolean;
+    links: Link[];
+    backlinks: Link[];
+    asLink: (title?: string) => Link;
     hasProperty: (name: string) => boolean;
+    hasTag: (...tags: string[]) => boolean;
+    hasLink: (...linkNames: (string | { name: string })[]) => boolean;
     inFolder: (folder: string) => boolean;
   };
   content: string;
