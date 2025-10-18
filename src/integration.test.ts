@@ -29,7 +29,7 @@ describe("integration", () => {
 
     const firstRow = result.rows[0];
     assert.ok(
-      firstRow["formula.title"]?.toString().includes("[[Second Note]]"),
+      firstRow["formula.title"]?.toString().includes("Second Note"),
       "First row should have Second Note (sorted by updated DESC)"
     );
     assert.ok(firstRow["formula.updated"], "Should have updated value");

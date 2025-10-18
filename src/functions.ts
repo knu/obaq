@@ -1,5 +1,44 @@
 import dayjs from "dayjs";
+import { toMarkdown } from "mdast-util-to-markdown";
+import { toMarkdown as wikiLinkToMarkdown } from "mdast-util-wiki-link";
 import type { ObsidianFile } from "./types.js";
+
+export class Link {
+  constructor(
+    public path: string,
+    public display?: string
+  ) {}
+
+  toString(): string {
+    const node: any = {
+      type: "wikiLink",
+      value: this.path,
+      data: {
+        alias: this.display,
+        permalink: this.path,
+      },
+    };
+
+    const result = toMarkdown(node, {
+      extensions: [wikiLinkToMarkdown({ aliasDivider: "|" })] as any,
+    }).trim();
+
+    // mdast-util-wiki-link always adds the separator even without display text
+    // Remove it if there's no display text
+    return this.display ? result : result.replace(/\|(?=\]\]$)/, "");
+  }
+
+  equals(other: Link | { name: string } | string): boolean {
+    if (typeof other === "string") {
+      return this.path === other;
+    }
+    if (other instanceof Link) {
+      return this.path === other.path;
+    }
+    // Compare with file object
+    return this.path === other.name;
+  }
+}
 
 // Global functions
 export const globalFunctions = {
@@ -16,11 +55,8 @@ export const globalFunctions = {
 
   min: (...values: number[]): number => Math.min(...values),
 
-  link: (path: string, display?: string): string => {
-    if (display) {
-      return `[[${path}|${display}]]`;
-    }
-    return `[[${path}]]`;
+  link: (path: string, display?: string): Link => {
+    return new Link(path, display);
   },
 
   list: (element: any): any[] => {

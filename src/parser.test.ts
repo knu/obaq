@@ -50,4 +50,68 @@ describe("parseVault", () => {
       );
     }
   });
+
+  it("should compute backlinks correctly", async () => {
+    const files = await parseVault(resolve("test-vault"));
+
+    // Find files by name
+    const noteA = files.find((f) => f.file.name === "NoteA");
+    const noteB = files.find((f) => f.file.name === "NoteB");
+    const noteC = files.find((f) => f.file.name === "NoteC");
+
+    assert.ok(noteA, "Should find NoteA");
+    assert.ok(noteB, "Should find NoteB");
+    assert.ok(noteC, "Should find NoteC");
+
+    // NoteA links to NoteB and NoteC
+    assert.ok(
+      noteA!.file.links.some((l) => l.equals("NoteB")),
+      "NoteA should link to NoteB"
+    );
+    assert.ok(
+      noteA!.file.links.some((l) => l.equals("NoteC")),
+      "NoteA should link to NoteC"
+    );
+
+    // NoteB links to NoteC
+    assert.ok(
+      noteB!.file.links.some((l) => l.equals("NoteC")),
+      "NoteB should link to NoteC"
+    );
+
+    // NoteC has no outgoing links
+    assert.strictEqual(
+      noteC!.file.links.length,
+      0,
+      "NoteC should have no links"
+    );
+
+    // NoteB should have backlinks from NoteA
+    assert.ok(
+      noteB!.file.backlinks.some((l) => l.equals("NoteA")),
+      "NoteB should have backlink from NoteA"
+    );
+
+    // NoteC should have backlinks from both NoteA and NoteB
+    assert.ok(
+      noteC!.file.backlinks.some((l) => l.equals("NoteA")),
+      "NoteC should have backlink from NoteA"
+    );
+    assert.ok(
+      noteC!.file.backlinks.some((l) => l.equals("NoteB")),
+      "NoteC should have backlink from NoteB"
+    );
+    assert.strictEqual(
+      noteC!.file.backlinks.length,
+      2,
+      "NoteC should have exactly 2 backlinks"
+    );
+
+    // NoteA should have no backlinks
+    assert.strictEqual(
+      noteA!.file.backlinks.length,
+      0,
+      "NoteA should have no backlinks"
+    );
+  });
 });

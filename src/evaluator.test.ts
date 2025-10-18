@@ -1,4 +1,5 @@
 import { describe, it } from "node:test";
+import { Link } from "./functions.js";
 import assert from "node:assert";
 import { evaluateExpression } from "./evaluator.js";
 import type { ObsidianFile } from "./types.js";
@@ -14,7 +15,10 @@ const mockFile: ObsidianFile = {
     mtime: new Date("2024-01-20T14:45:00+00:00"),
     properties: {},
     tags: ["tag1", "tag2"],
-    asLink: (title) => `[[${title || "Test"}]]`,
+    links: [],
+    backlinks: [],
+    hasLink: () => false,
+    asLink: (title) => new Link("Test", title),
     hasTag: (...tags) => tags.some((t) => ["tag1", "tag2"].includes(t)),
     hasProperty: (name) => name in mockFile,
     inFolder: (folder) =>
@@ -24,11 +28,17 @@ const mockFile: ObsidianFile = {
   note: {
     title: "Test Note",
     tags: ["tag1", "tag2"],
+    links: [],
+    backlinks: [],
+    hasLink: () => false,
     created: "2024-01-15T10:30:00+00:00",
     updated: "2024-01-20T14:45:00+00:00",
   },
   title: "Test Note",
   tags: ["tag1", "tag2"],
+  links: [],
+  backlinks: [],
+  hasLink: () => false,
   created: "2024-01-15T10:30:00+00:00",
   updated: "2024-01-20T14:45:00+00:00",
 };
@@ -40,8 +50,9 @@ describe("evaluateExpression", () => {
   });
 
   it("should evaluate file.asLink", () => {
-    const result = evaluateExpression("file.asLink(title)", mockFile);
-    assert.strictEqual(result, "[[Test Note]]");
+    const result = evaluateExpression("file.asLink(title)", mockFile) as Link;
+    assert.ok(result instanceof Link);
+    assert.strictEqual(result.toString(), "[[Test|Test Note]]");
   });
 
   it("should evaluate frontmatter properties", () => {
@@ -82,8 +93,12 @@ describe("evaluateExpression", () => {
   });
 
   it("should support link creation", () => {
-    const result = evaluateExpression('link("path", "display")', mockFile);
-    assert.strictEqual(result, "[[path|display]]");
+    const result = evaluateExpression(
+      'link("path", "display")',
+      mockFile
+    ) as Link;
+    assert.ok(result instanceof Link);
+    assert.strictEqual(result.toString(), "[[path|display]]");
   });
 
   it("should return undefined for invalid expressions", () => {
