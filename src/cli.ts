@@ -5,7 +5,8 @@ import { resolve } from "node:path";
 import { stdin } from "node:process";
 import { load } from "js-yaml";
 import { stringify } from "csv-stringify/sync";
-import { markdownTable } from "markdown-table";
+import { toMarkdown } from "mdast-util-to-markdown";
+import { gfmTableToMarkdown } from "mdast-util-gfm-table";
 import { parseVault } from "./parser.js";
 import { executeQuery } from "./query.js";
 import { findVaultRoot } from "./vault-finder.js";
@@ -90,12 +91,29 @@ function formatCSV(result: QueryResult): string {
 }
 
 function formatMarkdown(result: QueryResult): string {
-  const header = result.columns.map((col) => col.displayName);
-  const rows = result.rows.map((row) =>
-    result.columns.map((col) => String(row[col.id] ?? ""))
-  );
+  const table: any = {
+    type: "table",
+    children: [
+      {
+        type: "tableRow",
+        children: result.columns.map((col) => ({
+          type: "tableCell",
+          children: [{ type: "text", value: col.displayName }],
+        })),
+      },
+      ...result.rows.map((row) => ({
+        type: "tableRow",
+        children: result.columns.map((col) => ({
+          type: "tableCell",
+          children: [{ type: "text", value: String(row[col.id] ?? "") }],
+        })),
+      })),
+    ],
+  };
 
-  return markdownTable([header, ...rows]);
+  return toMarkdown(table, {
+    extensions: [gfmTableToMarkdown()] as any,
+  }).trim();
 }
 
 async function readStdin(): Promise<string> {
