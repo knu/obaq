@@ -33,7 +33,7 @@ async function main() {
 
   if (!queryYaml) {
     console.error(
-      `Usage: obsidian-base [-d|--directory VAULT_DIR] -e|--eval YAML [-f|--format ${SUPPORTED_FORMATS.join("|")}]`
+      `Usage: obaq [-d|--directory VAULT_DIR] -e|--eval YAML [-f|--format ${SUPPORTED_FORMATS.join("|")}]`
     );
     process.exit(1);
   }

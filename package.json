@@ -1,11 +1,11 @@
 {
-  "name": "obsidian-base",
+  "name": "obaq",
   "version": "1.0.0",
   "description": "CLI query processor for Obsidian Bases",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "obsidian-base": "dist/cli.js"
+    "obaq": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
