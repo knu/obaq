@@ -1,4 +1,4 @@
-# obsidian-base
+# obaq
 
 CLI query processor for Obsidian Bases
 
@@ -12,7 +12,7 @@ npm run build
 ## Usage
 
 ```sh
-obsidian-base [-d VAULT_DIR] -e YAML [-f FORMAT]
+obaq [-d VAULT_DIR] -e YAML [-f FORMAT]
 ```
 
 - `-d|--directory VAULT_DIR`: Path to the Obsidian vault directory (defaults to current directory, searches for vault root)
