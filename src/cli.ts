@@ -23,6 +23,8 @@ async function main() {
     eval?: string;
     f?: string;
     format?: string;
+    t?: string;
+    this?: string;
     h?: boolean;
     help?: boolean;
   };
@@ -36,6 +38,8 @@ async function main() {
         eval: { type: "string" },
         f: { type: "string" },
         format: { type: "string" },
+        t: { type: "string" },
+        this: { type: "string" },
         h: { type: "boolean" },
         help: { type: "boolean" },
       },
@@ -57,6 +61,7 @@ async function main() {
   const queryYaml = values.e || values.eval;
   const markdownPath = positionals[0];
   const formatOverride = values.f || values.format;
+  const thisPath = values.t || values.this;
 
   if (!queryYaml && !markdownPath) {
     printHelp();
@@ -103,6 +108,11 @@ async function main() {
 
   try {
     const files = await parseVault(resolvedDir);
+    const thisFile = markdownPath
+      ? findThisFile(files, resolvedDir, markdownPath)
+      : thisPath
+        ? resolveThisFile(files, resolvedDir, thisPath)
+        : undefined;
     if (queryYaml) {
       let resolvedQuery = queryYaml;
       if (resolvedQuery.startsWith("@")) {
@@ -116,12 +126,9 @@ async function main() {
       }
 
       const query = load(resolvedQuery) as BaseQuery;
-      const result = executeQuery(files, query);
+      const result = executeQuery(files, query, thisFile);
       console.log(formatResult(result, format));
     } else {
-      const thisFile = markdownPath
-        ? findThisFile(files, resolvedDir, markdownPath)
-        : undefined;
       const output = await replaceBaseCodeBlocks(markdownInput, {
         files,
         format,
@@ -160,6 +167,19 @@ function findThisFile(
   return files.find((file) => file.file.path === relPath);
 }
 
+function resolveThisFile(
+  files: ObsidianFile[],
+  vaultRoot: string,
+  thisPath: string
+): ObsidianFile {
+  const relPath = relative(vaultRoot, resolve(thisPath)).replace(/\\/g, "/");
+  const file = files.find((item) => item.file.path === relPath);
+  if (!file) {
+    throw new Error(`Unable to resolve --this file: ${thisPath}`);
+  }
+  return file;
+}
+
 function printHelp() {
   const formats = SUPPORTED_FORMATS.join("|");
   console.log(`Usage: obaq [options] (-e YAML | PATH.md)
@@ -168,6 +188,7 @@ Options:
   -d, --directory VAULT_DIR   Vault directory (defaults to cwd and auto-detects)
   -e, --eval YAML             YAML query string or @file.base (use @- for stdin)
   -f, --format FORMAT         Output format: ${formats}
+  -t, --this PATH             Use PATH as the "this" file context
   -h, --help                  Show this help
 
 Notes:

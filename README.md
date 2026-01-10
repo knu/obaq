@@ -26,6 +26,7 @@ obaq [-d VAULT_DIR] [-f FORMAT] (-e YAML | PATH.md)
 
 - `-d|--directory VAULT_DIR`: Path to the Obsidian vault directory (defaults to current directory, searches for vault root).
 - `-e|--eval YAML`: YAML query string or `@file.base` to load from file (use `@-` for stdin).
+- `-t|--this PATH`: File path to use as the `this` context for base queries.
 - `PATH.md`: Markdown file containing `\`\`\`base` blocks to evaluate and replace (use `-` for stdin).
 - `-f|--format FORMAT`: Output format: `json` (default for `-e`), `csv`, `md`, or `markdown` (default for `PATH.md`).
 
