@@ -1,11 +1,13 @@
 import { describe, it } from "node:test";
+import dayjs from "dayjs";
 import { Link } from "./functions.js";
+import { VaultFile } from "./types.js";
 import assert from "node:assert";
 import { evaluateExpression } from "./evaluator.js";
 import type { ObsidianFile } from "./types.js";
 
 const mockFile: ObsidianFile = {
-  file: {
+  file: new VaultFile({
     name: "Test",
     folder: "Notes",
     path: "Notes/Test.md",
@@ -15,15 +17,7 @@ const mockFile: ObsidianFile = {
     mtime: new Date("2024-01-20T14:45:00+00:00"),
     properties: {},
     tags: ["tag1", "tag2"],
-    links: [],
-    backlinks: [],
-    hasLink: () => false,
-    asLink: (title) => new Link("Test", title),
-    hasTag: (...tags) => tags.some((t) => ["tag1", "tag2"].includes(t)),
-    hasProperty: (name) => name in mockFile,
-    inFolder: (folder) =>
-      "Notes" === folder || "Notes".startsWith(folder + "/"),
-  },
+  }),
   content: "Test content",
   note: {
     title: "Test Note",
@@ -31,17 +25,20 @@ const mockFile: ObsidianFile = {
     links: [],
     backlinks: [],
     hasLink: () => false,
-    created: "2024-01-15T10:30:00+00:00",
-    updated: "2024-01-20T14:45:00+00:00",
+    created: new Date("2024-01-15T10:30:00+00:00"),
+    updated: new Date("2024-01-20T14:45:00+00:00"),
   },
   title: "Test Note",
   tags: ["tag1", "tag2"],
   links: [],
   backlinks: [],
   hasLink: () => false,
-  created: "2024-01-15T10:30:00+00:00",
-  updated: "2024-01-20T14:45:00+00:00",
+  created: new Date("2024-01-15T10:30:00+00:00"),
+  updated: new Date("2024-01-20T14:45:00+00:00"),
 };
+
+mockFile.file.setLinkResolver(() => []);
+mockFile.file.setBacklinkResolver(() => []);
 
 describe("evaluateExpression", () => {
   it("should evaluate file properties", () => {
@@ -91,6 +88,78 @@ describe("evaluateExpression", () => {
     assert.strictEqual(result, "2024-01-15");
   });
 
+  it("should support date arithmetic with durations", () => {
+    const result = evaluateExpression(
+      'date("2024-12-01") + "1M" + "4h" + "3m"',
+      mockFile
+    ) as Date;
+    const formatted = dayjs(result).format("YYYY-MM-DD HH:mm:ss");
+    assert.strictEqual(formatted, "2025-01-01 04:03:00");
+  });
+
+  it("should support date plus duration values", () => {
+    const result = evaluateExpression(
+      'date("2024-12-01") + duration("1M")',
+      mockFile
+    ) as Date;
+    const formatted = dayjs(result).format("YYYY-MM-DD HH:mm:ss");
+    assert.strictEqual(formatted, "2025-01-01 00:00:00");
+  });
+
+  it("should handle month boundaries in date arithmetic", () => {
+    const result = evaluateExpression(
+      'date("2024-01-31") + "1M"',
+      mockFile
+    ) as Date;
+    const formatted = dayjs(result).format("YYYY-MM-DD HH:mm:ss");
+    assert.strictEqual(formatted, "2024-02-29 00:00:00");
+  });
+
+  it("should handle month boundaries in date subtraction", () => {
+    const endOfMonth = evaluateExpression(
+      'date("2024-01-31") - "2M"',
+      mockFile
+    ) as Date;
+    assert.strictEqual(
+      dayjs(endOfMonth).format("YYYY-MM-DD HH:mm:ss"),
+      "2023-11-30 00:00:00"
+    );
+
+    const midMonth = evaluateExpression(
+      'date("2024-02-28") - "2M"',
+      mockFile
+    ) as Date;
+    assert.strictEqual(
+      dayjs(midMonth).format("YYYY-MM-DD HH:mm:ss"),
+      "2023-12-28 00:00:00"
+    );
+  });
+
+  it("should handle arithmetic, unary, comparison, and logical operators", () => {
+    assert.strictEqual(evaluateExpression("(2 + 3) * (9 - 7)", mockFile), 10);
+    assert.strictEqual(evaluateExpression("-(1 + 2) + +3", mockFile), 0);
+    assert.strictEqual(evaluateExpression("5 > 3", mockFile), true);
+    assert.strictEqual(
+      evaluateExpression('5 > 3 && "a" == "a"', mockFile),
+      true
+    );
+  });
+
+  it("should support regexp matches", () => {
+    assert.strictEqual(
+      evaluateExpression('/abc/.matches("abcde")', mockFile),
+      true
+    );
+    assert.strictEqual(
+      evaluateExpression('/abc/.matches("def")', mockFile),
+      false
+    );
+    assert.strictEqual(
+      evaluateExpression('/a[^/]c\\/d/.matches("abc/def")', mockFile),
+      true
+    );
+  });
+
   it("should support link creation", () => {
     const result = evaluateExpression(
       'link("path", "display")',
@@ -98,6 +167,21 @@ describe("evaluateExpression", () => {
     ) as Link;
     assert.ok(result instanceof Link);
     assert.strictEqual(result.toString(), "[[path|display]]");
+  });
+
+  it("should support file methods", () => {
+    assert.strictEqual(
+      evaluateExpression('file.hasProperty("title")', mockFile),
+      false
+    );
+    assert.strictEqual(
+      evaluateExpression('file.hasTag("tag1")', mockFile),
+      true
+    );
+    assert.strictEqual(
+      evaluateExpression('file.inFolder("Notes")', mockFile),
+      true
+    );
   });
 
   it("should return undefined for invalid expressions", () => {

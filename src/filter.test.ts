@@ -2,81 +2,62 @@ import { describe, it } from "node:test";
 import { Link } from "./functions.js";
 import assert from "node:assert";
 import { applyFilter } from "./filter.js";
-import type { ObsidianFile, Filter } from "./types.js";
+import { VaultFile, type ObsidianFile, type Filter } from "./types.js";
+
+const baseFileOptions = {
+  ext: "md",
+  size: 1024,
+  ctime: new Date("2024-01-01"),
+  mtime: new Date("2024-01-01"),
+  tags: [],
+};
+
+function createMockFile(options: {
+  name: string;
+  folder: string;
+  properties: Record<string, unknown>;
+  content: string;
+  links?: Link[];
+  backlinks?: Link[];
+}) {
+  const path = `${options.folder}/${options.name}.md`;
+  const file = new VaultFile({
+    ...baseFileOptions,
+    name: options.name,
+    folder: options.folder,
+    path,
+    properties: options.properties,
+  });
+  file.setLinkResolver(() => options.links ?? []);
+  file.setBacklinkResolver(() => options.backlinks ?? []);
+
+  return {
+    file,
+    content: options.content,
+    note: options.properties,
+    ...options.properties,
+  } as ObsidianFile;
+}
 
 const mockFiles: ObsidianFile[] = [
-  {
-    file: {
-      name: "File1",
-      folder: "Notes",
-      path: "Notes/File1.md",
-      ext: "md",
-      size: 1024,
-      ctime: new Date("2024-01-01"),
-      mtime: new Date("2024-01-01"),
-      properties: { title: "First File", status: "done" },
-      tags: [],
-      links: [],
-      backlinks: [],
-      hasLink: () => false,
-      asLink: () => new Link("File1"),
-      hasTag: () => false,
-      hasProperty: (n) => n === "title" || n === "status",
-      inFolder: (f) => "Notes" === f,
-    },
+  createMockFile({
+    name: "File1",
+    folder: "Notes",
+    properties: { title: "First File", status: "done" },
     content: "Content 1",
-    note: { title: "First File", status: "done" },
-    title: "First File",
-    status: "done",
-  },
-  {
-    file: {
-      name: "File2",
-      folder: "Notes",
-      path: "Notes/File2.md",
-      ext: "md",
-      size: 1024,
-      ctime: new Date("2024-01-01"),
-      mtime: new Date("2024-01-01"),
-      properties: { title: "Second File", status: "pending" },
-      tags: [],
-      links: [],
-      backlinks: [],
-      hasLink: () => false,
-      asLink: () => new Link("File2"),
-      hasTag: () => false,
-      hasProperty: (n) => n === "title" || n === "status",
-      inFolder: (f) => "Notes" === f,
-    },
+  }),
+  createMockFile({
+    name: "File2",
+    folder: "Notes",
+    properties: { title: "Second File", status: "pending" },
     content: "Content 2",
-    note: { title: "Second File", status: "pending" },
-    title: "Second File",
-    status: "pending",
-  },
-  {
-    file: {
-      name: "File3",
-      folder: "Archive",
-      path: "Archive/File3.md",
-      ext: "md",
-      size: 1024,
-      ctime: new Date("2024-01-01"),
-      mtime: new Date("2024-01-01"),
-      properties: { title: "Third File", status: "done" },
-      tags: [],
-      links: [],
-      backlinks: [],
-      hasLink: () => false,
-      asLink: () => new Link("File3"),
-      hasTag: () => false,
-      hasProperty: (n) => n === "title" || n === "status",
-      inFolder: (f) => "Archive" === f,
-    },
+  }),
+  createMockFile({
+    name: "File3",
+    folder: "Archive",
+    properties: { title: "Third File", status: "done" },
     content: "Content 3",
-    note: { title: "Third File", status: "done" },
-    title: "Third File",
-    status: "done",
-  },
+  }),
 ];
 
 describe("applyFilter", () => {
@@ -166,20 +147,20 @@ describe("applyFilter", () => {
 
   it("should filter using hasLink function", () => {
     const filesWithLinks: ObsidianFile[] = [
-      {
-        ...mockFiles[0],
-        file: {
-          ...mockFiles[0].file,
-          hasLink: (...names) => names.includes("LinkedNote"),
-        },
-      },
-      {
-        ...mockFiles[1],
-        file: {
-          ...mockFiles[1].file,
-          hasLink: () => false,
-        },
-      },
+      createMockFile({
+        name: "File1",
+        folder: "Notes",
+        properties: { title: "First File", status: "done" },
+        content: "Content 1",
+        links: [new Link("LinkedNote")],
+      }),
+      createMockFile({
+        name: "File2",
+        folder: "Notes",
+        properties: { title: "Second File", status: "pending" },
+        content: "Content 2",
+        links: [],
+      }),
     ];
     const filter: Filter = { and: ['file.hasLink("LinkedNote")'] };
     const result = applyFilter(filesWithLinks, filter);
@@ -189,35 +170,27 @@ describe("applyFilter", () => {
 
   it("should filter using multiple link names in hasLink", () => {
     const filesWithLinks: ObsidianFile[] = [
-      {
-        ...mockFiles[0],
-        file: {
-          ...mockFiles[0].file,
-          hasLink: (...names) =>
-            names.some((n) => {
-              const name = typeof n === "string" ? n : n.name;
-              return ["NoteA", "NoteB"].includes(name);
-            }),
-        },
-      },
-      {
-        ...mockFiles[1],
-        file: {
-          ...mockFiles[1].file,
-          hasLink: (...names) =>
-            names.some((n) => {
-              const name = typeof n === "string" ? n : n.name;
-              return name === "NoteC";
-            }),
-        },
-      },
-      {
-        ...mockFiles[2],
-        file: {
-          ...mockFiles[2].file,
-          hasLink: () => false,
-        },
-      },
+      createMockFile({
+        name: "File1",
+        folder: "Notes",
+        properties: { title: "First File", status: "done" },
+        content: "Content 1",
+        links: [new Link("NoteA"), new Link("NoteB")],
+      }),
+      createMockFile({
+        name: "File2",
+        folder: "Notes",
+        properties: { title: "Second File", status: "pending" },
+        content: "Content 2",
+        links: [new Link("NoteC")],
+      }),
+      createMockFile({
+        name: "File3",
+        folder: "Archive",
+        properties: { title: "Third File", status: "done" },
+        content: "Content 3",
+        links: [],
+      }),
     ];
     const filter: Filter = { and: ['file.hasLink("NoteA", "NoteC")'] };
     const result = applyFilter(filesWithLinks, filter);
@@ -228,20 +201,20 @@ describe("applyFilter", () => {
 
   it("should access backlinks property", () => {
     const filesWithBacklinks: ObsidianFile[] = [
-      {
-        ...mockFiles[0],
-        file: {
-          ...mockFiles[0].file,
-          backlinks: [new Link("File2"), new Link("File3")],
-        },
-      },
-      {
-        ...mockFiles[1],
-        file: {
-          ...mockFiles[1].file,
-          backlinks: [],
-        },
-      },
+      createMockFile({
+        name: "File1",
+        folder: "Notes",
+        properties: { title: "First File", status: "done" },
+        content: "Content 1",
+        backlinks: [new Link("File2"), new Link("File3")],
+      }),
+      createMockFile({
+        name: "File2",
+        folder: "Notes",
+        properties: { title: "Second File", status: "pending" },
+        content: "Content 2",
+        backlinks: [],
+      }),
     ];
     const filter: Filter = { and: ["file.backlinks.length > 0"] };
     const result = applyFilter(filesWithBacklinks, filter);
@@ -252,25 +225,20 @@ describe("applyFilter", () => {
   it("should support hasLink with file object", () => {
     const targetFile = mockFiles[0];
     const filesWithLinks: ObsidianFile[] = [
-      {
-        ...mockFiles[1],
-        file: {
-          ...mockFiles[1].file,
-          hasLink: (...names) => {
-            return names.some((n) => {
-              const name = typeof n === "string" ? n : n.name;
-              return name === "File1";
-            });
-          },
-        },
-      },
-      {
-        ...mockFiles[2],
-        file: {
-          ...mockFiles[2].file,
-          hasLink: () => false,
-        },
-      },
+      createMockFile({
+        name: "File2",
+        folder: "Notes",
+        properties: { title: "Second File", status: "pending" },
+        content: "Content 2",
+        links: [new Link("File1")],
+      }),
+      createMockFile({
+        name: "File3",
+        folder: "Archive",
+        properties: { title: "Third File", status: "done" },
+        content: "Content 3",
+        links: [],
+      }),
     ];
 
     // Simulate file.hasLink(this.file) by passing file object

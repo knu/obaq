@@ -134,10 +134,10 @@ describe("integration", () => {
     const result = executeQuery(files, query);
     assert.strictEqual(result.rows.length, 2, "Should have 2 rows");
 
-    const firstUpdated = result.rows[0]["note.updated"] as string;
-    const secondUpdated = result.rows[1]["note.updated"] as string;
+    const firstUpdated = result.rows[0]["note.updated"] as Date;
+    const secondUpdated = result.rows[1]["note.updated"] as Date;
     assert.ok(
-      firstUpdated >= secondUpdated,
+      +firstUpdated >= +secondUpdated,
       "First row should have later or equal updated time"
     );
   });

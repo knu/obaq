@@ -1,12 +1,11 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, dirname, basename, extname } from "node:path";
 import matter from "gray-matter";
-import dayjs from "dayjs";
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import remarkWikiLink from "remark-wiki-link";
 import { Link } from "./functions.js";
-import type { ObsidianFile } from "./types.js";
+import { VaultFile, type ObsidianFile } from "./types.js";
 
 export async function parseVault(vaultPath: string): Promise<ObsidianFile[]> {
   const files: ObsidianFile[] = [];
@@ -21,22 +20,19 @@ export async function parseVault(vaultPath: string): Promise<ObsidianFile[]> {
 }
 
 function setupBacklinks(targetFile: ObsidianFile, allFiles: ObsidianFile[]) {
-  Object.defineProperty(targetFile.file, "backlinks", {
-    get: () => {
-      const backlinks: Link[] = [];
+  targetFile.file.setBacklinkResolver(() => {
+    const backlinks: Link[] = [];
 
-      for (const otherFile of allFiles) {
-        if (otherFile === targetFile) continue;
+    for (const otherFile of allFiles) {
+      if (otherFile === targetFile) continue;
 
-        // Check if this file links to the target
-        if (otherFile.file.links.some((link) => link.equals(targetFile.file))) {
-          backlinks.push(new Link(otherFile.file.name));
-        }
+      // Check if this file links to the target
+      if (otherFile.file.links.some((link) => link.equals(targetFile.file))) {
+        backlinks.push(new Link(otherFile.file.name));
       }
+    }
 
-      return backlinks;
-    },
-    enumerable: true,
+    return backlinks;
   });
 }
 
@@ -71,11 +67,7 @@ async function scanDirectory(
         content = parsed.content;
 
         for (const [key, value] of Object.entries(parsed.data)) {
-          if (value instanceof Date) {
-            frontmatter[key] = dayjs(value).format("YYYY-MM-DDTHH:mm:ssZ");
-          } else {
-            frontmatter[key] = value;
-          }
+          frontmatter[key] = value;
         }
       }
 
@@ -137,7 +129,7 @@ async function scanDirectory(
         return links;
       };
 
-      const fileObj = {
+      const fileObj = new VaultFile({
         name: fileName,
         folder: folderPath === "." ? "" : folderPath,
         path: relativePath,
@@ -147,26 +139,8 @@ async function scanDirectory(
         mtime: stats.mtime,
         properties: frontmatter,
         tags: fileTags,
-        asLink: (title?: string) => new Link(fileName, title),
-        hasTag: (...tags: string[]) =>
-          tags.some((tag) => fileTags.includes(tag)),
-        hasProperty: (name: string) => name in frontmatter,
-        inFolder: (folder: string) => {
-          const fileFolder = folderPath === "." ? "" : folderPath;
-          return fileFolder === folder || fileFolder.startsWith(folder + "/");
-        },
-        hasLink: (...linkNames: (string | { name: string })[]) => {
-          const fileLinks = extractLinks();
-          return linkNames.some((link) => {
-            return fileLinks.some((l) => l.equals(link));
-          });
-        },
-      };
-
-      Object.defineProperty(fileObj, "links", {
-        get: extractLinks,
-        enumerable: true,
       });
+      fileObj.setLinkResolver(extractLinks);
 
       const obsidianFile: ObsidianFile = {
         file: fileObj as ObsidianFile["file"],

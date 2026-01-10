@@ -1,7 +1,7 @@
 formulas:
   title: file.asLink(title)
-  updated: updated.replace(/T(.+)\+/, " $1")
-  created: created.replace(/T(.+)\+/, " $1")
+  updated: updated.format("YYYY-MM-DD HH:mm:ss")
+  created: created.format("YYYY-MM-DD HH:mm:ss")
 properties:
   formula.title:
     displayName: Title

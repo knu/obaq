@@ -6,12 +6,11 @@ import { replaceBaseCodeBlocks } from "./markdown.js";
 import { parseVault } from "./parser.js";
 import { executeQuery } from "./query.js";
 import { formatResult } from "./output.js";
-import type { BaseQuery, ObsidianFile } from "./types.js";
-import { Link } from "./functions.js";
+import { VaultFile, type BaseQuery, type ObsidianFile } from "./types.js";
 
 const mockFiles: ObsidianFile[] = [
   {
-    file: {
+    file: new VaultFile({
       name: "Note1",
       folder: "Notes",
       path: "Notes/Note1.md",
@@ -21,19 +20,15 @@ const mockFiles: ObsidianFile[] = [
       mtime: new Date("2024-01-01"),
       properties: { title: "First Note" },
       tags: [],
-      links: [],
-      backlinks: [],
-      asLink: () => new Link("Note1"),
-      hasProperty: (n) => n === "title",
-      hasTag: () => false,
-      hasLink: () => false,
-      inFolder: (f) => "Notes" === f,
-    },
+    }),
     content: "Content 1",
     note: { title: "First Note" },
     title: "First Note",
   },
 ];
+
+mockFiles[0].file.setLinkResolver(() => []);
+mockFiles[0].file.setBacklinkResolver(() => []);
 
 describe("replaceBaseCodeBlocks", () => {
   it("replaces base blocks with markdown output", async () => {

@@ -38,16 +38,7 @@ describe("parseVault", () => {
     const fileWithDate = files.find((f) => f.created);
 
     if (fileWithDate) {
-      assert.ok(
-        typeof fileWithDate.created === "string",
-        "Date should be string"
-      );
-      assert.ok(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/.test(
-          fileWithDate.created as string
-        ),
-        "Date should be in ISO format with timezone"
-      );
+      assert.ok(fileWithDate.created instanceof Date, "Date should be Date");
     }
   });
 

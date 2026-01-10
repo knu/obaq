@@ -1,12 +1,11 @@
 import { describe, it } from "node:test";
-import { Link } from "./functions.js";
 import assert from "node:assert";
 import { executeQuery } from "./query.js";
-import type { BaseQuery, ObsidianFile } from "./types.js";
+import { VaultFile, type BaseQuery, type ObsidianFile } from "./types.js";
 
 const mockFiles: ObsidianFile[] = [
   {
-    file: {
+    file: new VaultFile({
       name: "Note1",
       folder: "Notes",
       path: "Notes/Note1.md",
@@ -16,21 +15,14 @@ const mockFiles: ObsidianFile[] = [
       mtime: new Date("2024-01-01"),
       properties: { title: "First Note", priority: 1 },
       tags: [],
-      links: [],
-      backlinks: [],
-      asLink: () => new Link("Note1"),
-      hasProperty: (n) => n === "title" || n === "priority",
-      hasTag: () => false,
-      hasLink: () => false,
-      inFolder: (f) => "Notes" === f,
-    },
+    }),
     content: "Content 1",
     note: { title: "First Note", priority: 1 },
     title: "First Note",
     priority: 1,
   },
   {
-    file: {
+    file: new VaultFile({
       name: "Note2",
       folder: "Notes",
       path: "Notes/Note2.md",
@@ -40,21 +32,14 @@ const mockFiles: ObsidianFile[] = [
       mtime: new Date("2024-01-01"),
       properties: { title: "Second Note", priority: 2 },
       tags: [],
-      links: [],
-      backlinks: [],
-      asLink: () => new Link("Note2"),
-      hasProperty: (n) => n === "title" || n === "priority",
-      hasTag: () => false,
-      hasLink: () => false,
-      inFolder: (f) => "Notes" === f,
-    },
+    }),
     content: "Content 2",
     note: { title: "Second Note", priority: 2 },
     title: "Second Note",
     priority: 2,
   },
   {
-    file: {
+    file: new VaultFile({
       name: "Note3",
       folder: "Archive",
       path: "Archive/Note3.md",
@@ -64,20 +49,18 @@ const mockFiles: ObsidianFile[] = [
       mtime: new Date("2024-01-01"),
       properties: { title: "Third Note", priority: 3 },
       tags: [],
-      links: [],
-      backlinks: [],
-      asLink: () => new Link("Note3"),
-      hasProperty: (n) => n === "title" || n === "priority",
-      hasTag: () => false,
-      hasLink: () => false,
-      inFolder: (f) => "Archive" === f,
-    },
+    }),
     content: "Content 3",
     note: { title: "Third Note", priority: 3 },
     title: "Third Note",
     priority: 3,
   },
 ];
+
+for (const file of mockFiles) {
+  file.file.setLinkResolver(() => []);
+  file.file.setBacklinkResolver(() => []);
+}
 
 describe("executeQuery", () => {
   it("should return empty result when no views", () => {
