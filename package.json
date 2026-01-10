@@ -1,6 +1,6 @@
 {
   "name": "obaq",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CLI query processor for Obsidian Bases",
   "type": "module",
   "main": "dist/index.js",
@@ -9,6 +9,7 @@
   },
   "files": [
     "dist/",
+    "CHANGELOG.md",
     "LICENSE",
     "README.md",
     "package.json"
@@ -28,6 +29,14 @@
     "cli"
   ],
   "author": "Akinori Musha <knu@idaemons.org>",
+  "homepage": "https://github.com/knu/obaq",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/knu/obaq.git"
+  },
+  "bugs": {
+    "url": "https://github.com/knu/obaq/issues"
+  },
   "license": "BSD-2-Clause",
   "dependencies": {
     "acorn": "^8.15.0",
