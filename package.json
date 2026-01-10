@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "fetch:docs": "node scripts/fetch-docs.js",
     "format": "prettier --write 'src/**/*.ts' 'test-vault/**/*.base'",
     "lint": "eslint src --ext .ts",
     "test": "npm run build && node --test $(find dist -name '*.test.js')",
