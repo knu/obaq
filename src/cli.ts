@@ -25,10 +25,19 @@ async function main() {
     format?: string;
     t?: string;
     this?: string;
+    version?: boolean;
     h?: boolean;
     help?: boolean;
   };
   let positionals: string[];
+  let version = "unknown";
+  try {
+    version = await readPackageVersion();
+  } catch (error) {
+    console.error(
+      `Warning: unable to read package version: ${error instanceof Error ? error.message : error}`
+    );
+  }
   try {
     ({ values, positionals } = parseArgs({
       options: {
@@ -40,6 +49,7 @@ async function main() {
         format: { type: "string" },
         t: { type: "string" },
         this: { type: "string" },
+        version: { type: "boolean" },
         h: { type: "boolean" },
         help: { type: "boolean" },
       },
@@ -48,12 +58,17 @@ async function main() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Error: ${message}`);
-    printHelp();
+    printHelp(version);
     process.exit(1);
   }
 
+  if (values.version) {
+    console.log(version);
+    process.exit(0);
+  }
+
   if (values.h || values.help) {
-    printHelp();
+    printHelp(version);
     process.exit(0);
   }
 
@@ -64,7 +79,7 @@ async function main() {
   const thisPath = values.t || values.this;
 
   if (!queryYaml && !markdownPath) {
-    printHelp();
+    printHelp(version);
     process.exit(1);
   }
 
@@ -180,21 +195,31 @@ function resolveThisFile(
   return file;
 }
 
-function printHelp() {
+function printHelp(version: string) {
   const formats = SUPPORTED_FORMATS.join("|");
-  console.log(`Usage: obaq [options] (-e YAML | PATH.md)
+  console.log(`obaq version ${version}
+
+Usage: obaq [options] (-e YAML | PATH.md)
 
 Options:
   -d, --directory VAULT_DIR   Vault directory (defaults to cwd and auto-detects)
   -e, --eval YAML             YAML query string or @file.base (use @- for stdin)
   -f, --format FORMAT         Output format: ${formats}
   -t, --this PATH             Use PATH as the "this" file context
+      --version               Show version
   -h, --help                  Show this help
 
 Notes:
   - Specify either -e/--eval or a Markdown file, not both.
   - Use "-" as PATH.md to read Markdown from stdin.
 `);
+}
+
+async function readPackageVersion(): Promise<string> {
+  const packageUrl = new URL("../package.json", import.meta.url);
+  const contents = await readFile(packageUrl, "utf-8");
+  const data = JSON.parse(contents) as { version?: string };
+  return data.version ?? "unknown";
 }
 
 main();
