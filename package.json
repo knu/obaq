@@ -7,6 +7,12 @@
   "bin": {
     "obaq": "dist/cli.js"
   },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
