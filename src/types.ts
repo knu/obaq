@@ -1,4 +1,5 @@
 export interface BaseQuery {
+  filters?: Filter;
   formulas?: Record<string, string>;
   properties?: Record<string, PropertyConfig>;
   views?: View[];

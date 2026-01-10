@@ -27,14 +27,42 @@ const mockFile: ObsidianFile = {
     hasLink: () => false,
     created: new Date("2024-01-15T10:30:00+00:00"),
     updated: new Date("2024-01-20T14:45:00+00:00"),
+    price: 12.5,
+    quantity: 3,
+    description: "Example",
+    status: "In Progress",
+    due_date: new Date("2000-01-01T00:00:00+00:00"),
+    tasks: ["a", "b", "c"],
+    first_name: "Ada",
+    last_name: "Lovelace",
+    impact: 2,
+    urgency: 3,
+    effort: 2,
+    monthlyUses: 4,
   },
   title: "Test Note",
-  tags: ["tag1", "tag2"],
+  tags: ["tag1", "tag2", "urgent"],
   links: [],
   backlinks: [],
   hasLink: () => false,
   created: new Date("2024-01-15T10:30:00+00:00"),
   updated: new Date("2024-01-20T14:45:00+00:00"),
+  price: 12.5,
+  quantity: 3,
+  description: "Example",
+  status: "In Progress",
+  due_date: new Date("2000-01-01T00:00:00+00:00"),
+  tasks: ["a", "b", "c"],
+  first_name: "Ada",
+  last_name: "Lovelace",
+  impact: 2,
+  urgency: 3,
+  effort: 2,
+  monthlyUses: 4,
+  formula: {
+    price_per_unit: 6.25,
+    Owned: 2.4,
+  },
 };
 
 mockFile.file.setLinkResolver(() => []);
@@ -180,6 +208,42 @@ describe("evaluateExpression", () => {
     );
     assert.strictEqual(
       evaluateExpression('file.inFolder("Notes")', mockFile),
+      true
+    );
+  });
+
+  it("should support formula examples from docs", () => {
+    assert.strictEqual(evaluateExpression("price * quantity", mockFile), 37.5);
+    assert.strictEqual(
+      evaluateExpression('file.name + " - " + description', mockFile),
+      "Test - Example"
+    );
+    assert.strictEqual(
+      evaluateExpression(
+        'if(due_date < now() && status != "Done", "Overdue", "")',
+        mockFile
+      ),
+      "Overdue"
+    );
+    assert.strictEqual(
+      evaluateExpression('if(price, "$" + price.toFixed(2), "")', mockFile),
+      "$12.50"
+    );
+    assert.strictEqual(evaluateExpression("tasks.length", mockFile), 3);
+    assert.strictEqual(
+      evaluateExpression("(impact * urgency) / effort", mockFile),
+      3
+    );
+    assert.strictEqual(
+      evaluateExpression('first_name + " " + last_name', mockFile),
+      "Ada Lovelace"
+    );
+    assert.strictEqual(
+      evaluateExpression("monthlyUses * formula.Owned.round()", mockFile),
+      8
+    );
+    assert.strictEqual(
+      evaluateExpression('tags.contains("urgent")', mockFile),
       true
     );
   });

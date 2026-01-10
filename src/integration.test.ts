@@ -113,6 +113,31 @@ describe("integration", () => {
     );
   });
 
+  it("should combine base and view filters", async () => {
+    const vaultPath = resolve("test-vault");
+    const files = await parseVault(vaultPath);
+
+    const query: BaseQuery = {
+      filters: 'file.folder == "ChatGPT"',
+      views: [
+        {
+          type: "table",
+          name: "Test",
+          filters: { and: ['file.name == "Note1"'] },
+          order: ["note.title"],
+        },
+      ],
+    };
+
+    const result = executeQuery(files, query);
+    assert.strictEqual(result.rows.length, 1, "Should return 1 row");
+    assert.strictEqual(
+      result.rows[0]["note.title"],
+      "First Note",
+      "Should match Note1"
+    );
+  });
+
   it("should sort results correctly", async () => {
     const vaultPath = resolve("test-vault");
     const files = await parseVault(vaultPath);

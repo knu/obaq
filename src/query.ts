@@ -4,6 +4,7 @@ import type {
   QueryResult,
   Column,
   Row,
+  Filter,
 } from "./types.js";
 import { evaluateExpression } from "./evaluator.js";
 import { applyFilter } from "./filter.js";
@@ -18,9 +19,10 @@ export function executeQuery(
     return { columns: [], rows: [] };
   }
 
+  const combinedFilter = mergeFilters(query.filters, view.filters);
   const computedRows: Row[] = applyFilter(
     files,
-    view.filters,
+    combinedFilter,
     thisContext,
     files
   ).map((file) => {
@@ -82,4 +84,13 @@ export function executeQuery(
   });
 
   return { columns, rows: finalRows };
+}
+
+function mergeFilters(
+  baseFilter?: Filter,
+  viewFilter?: Filter
+): Filter | undefined {
+  if (!baseFilter) return viewFilter;
+  if (!viewFilter) return baseFilter;
+  return { and: [baseFilter, viewFilter] };
 }

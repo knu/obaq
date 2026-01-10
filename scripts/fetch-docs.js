@@ -15,6 +15,11 @@ const DOCS = [
     pageUrl: "https://help.obsidian.md/bases/syntax",
     outputPath: `${ROOT_DIR}/docs/syntax.md`,
   },
+  {
+    name: "formulas",
+    pageUrl: "https://help.obsidian.md/formulas",
+    outputPath: `${ROOT_DIR}/docs/formulas.md`,
+  },
 ];
 
 async function fetchText(url) {
