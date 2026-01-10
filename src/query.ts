@@ -10,32 +10,35 @@ import { applyFilter } from "./filter.js";
 
 export function executeQuery(
   files: ObsidianFile[],
-  query: BaseQuery
+  query: BaseQuery,
+  thisContext?: ObsidianFile
 ): QueryResult {
   const view = query.views?.[0];
   if (!view) {
     return { columns: [], rows: [] };
   }
 
-  const computedRows: Row[] = applyFilter(files, view.filters).map((file) => {
-    const row: Row = {};
+  const computedRows: Row[] = applyFilter(files, view.filters, thisContext).map(
+    (file) => {
+      const row: Row = {};
 
-    if (query.formulas) {
-      for (const [key, expr] of Object.entries(query.formulas)) {
-        const formulaKey = `formula.${key}`;
-        row[formulaKey] = evaluateExpression(expr, file);
+      if (query.formulas) {
+        for (const [key, expr] of Object.entries(query.formulas)) {
+          const formulaKey = `formula.${key}`;
+          row[formulaKey] = evaluateExpression(expr, file, thisContext ?? file);
+        }
       }
-    }
 
-    for (const [key, value] of Object.entries(file)) {
-      if (key !== "file" && key !== "content") {
-        row[`note.${key}`] = value;
+      for (const [key, value] of Object.entries(file)) {
+        if (key !== "file" && key !== "content") {
+          row[`note.${key}`] = value;
+        }
       }
-    }
 
-    row._file = file;
-    return row;
-  });
+      row._file = file;
+      return row;
+    }
+  );
 
   if (view.sort) {
     computedRows.sort((a, b) => {

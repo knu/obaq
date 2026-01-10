@@ -29,8 +29,8 @@ describe("integration", () => {
 
     const firstRow = result.rows[0];
     assert.ok(
-      firstRow["formula.title"]?.toString().includes("Second Note"),
-      "First row should have Second Note (sorted by updated DESC)"
+      firstRow["formula.title"]?.toString().includes("ChatGPT/Note2.md"),
+      "First row should have ChatGPT/Note2.md (sorted by updated DESC)"
     );
     assert.ok(firstRow["formula.updated"], "Should have updated value");
     assert.ok(firstRow["formula.created"], "Should have created value");
@@ -99,8 +99,8 @@ describe("integration", () => {
     );
     assert.ok(row, "Should find row with First Note");
     assert.ok(
-      row!["formula.titleLink"]?.toString().includes("[["),
-      "Should have wiki link format"
+      row!["formula.titleLink"]?.toString().includes("]("),
+      "Should have markdown link format"
     );
     assert.match(
       row!["formula.dateFormatted"] as string,

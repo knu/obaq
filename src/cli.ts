@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { stdin } from "node:process";
 import { load } from "js-yaml";
-import { stringify } from "csv-stringify/sync";
-import { toMarkdown } from "mdast-util-to-markdown";
-import { gfmTableToMarkdown } from "mdast-util-gfm-table";
 import { parseVault } from "./parser.js";
 import { executeQuery } from "./query.js";
 import { findVaultRoot } from "./vault-finder.js";
-import type { BaseQuery, QueryResult } from "./types.js";
-
-const SUPPORTED_FORMATS = ["json", "csv", "md", "markdown"] as const;
-type OutputFormat = (typeof SUPPORTED_FORMATS)[number];
+import { replaceBaseCodeBlocks } from "./markdown.js";
+import {
+  formatResult,
+  SUPPORTED_FORMATS,
+  type OutputFormat,
+} from "./output.js";
+import type { BaseQuery, ObsidianFile } from "./types.js";
 
 async function main() {
-  const { values } = parseArgs({
+  const { values, positionals } = parseArgs({
     options: {
       d: { type: "string" },
       directory: { type: "string" },
@@ -25,20 +25,52 @@ async function main() {
       f: { type: "string" },
       format: { type: "string" },
     },
+    allowPositionals: true,
   });
 
   const vaultDir = values.d || values.directory;
-  let queryYaml = values.e || values.eval;
-  const format = (values.f || values.format || "json") as OutputFormat;
+  const queryYaml = values.e || values.eval;
+  const markdownPath = positionals[0];
+  const formatOverride = values.f || values.format;
 
-  if (!queryYaml) {
+  if (!queryYaml && !markdownPath) {
     console.error(
-      `Usage: obaq [-d|--directory VAULT_DIR] -e|--eval YAML [-f|--format ${SUPPORTED_FORMATS.join("|")}]`
+      `Usage: obaq [-d|--directory VAULT_DIR] [-f|--format ${SUPPORTED_FORMATS.join(
+        "|"
+      )}] (-e|--eval YAML | PATH.md)`
     );
     process.exit(1);
   }
 
-  const startDir = vaultDir ? resolve(vaultDir) : process.cwd();
+  if (queryYaml && markdownPath) {
+    console.error(
+      "Error: you can only specify either -e/--eval or a Markdown file."
+    );
+    process.exit(1);
+  }
+
+  if (positionals.length > 1) {
+    console.error("Error: only one Markdown file may be specified.");
+    process.exit(1);
+  }
+
+  const format = (formatOverride ||
+    (markdownPath ? "markdown" : "json")) as OutputFormat;
+
+  const markdownInput =
+    markdownPath === "-"
+      ? await readStdin()
+      : markdownPath
+        ? await readFile(markdownPath, "utf-8")
+        : "";
+  const markdownDir =
+    markdownPath === "-"
+      ? process.cwd()
+      : markdownPath
+        ? dirname(resolve(markdownPath))
+        : process.cwd();
+
+  const startDir = vaultDir ? resolve(vaultDir) : markdownDir;
   const resolvedDir = await findVaultRoot(startDir);
 
   if (!SUPPORTED_FORMATS.includes(format)) {
@@ -49,71 +81,39 @@ async function main() {
   }
 
   try {
-    if (queryYaml.startsWith("@")) {
-      const path = queryYaml.slice(1);
-      if (path === "-") {
-        queryYaml = await readStdin();
-      } else {
-        const filePath = resolve(path);
-        queryYaml = await readFile(filePath, "utf-8");
-      }
-    }
-
-    const query = load(queryYaml) as BaseQuery;
     const files = await parseVault(resolvedDir);
-    const result = executeQuery(files, query);
+    if (queryYaml) {
+      let resolvedQuery = queryYaml;
+      if (resolvedQuery.startsWith("@")) {
+        const path = resolvedQuery.slice(1);
+        if (path === "-") {
+          resolvedQuery = await readStdin();
+        } else {
+          const filePath = resolve(path);
+          resolvedQuery = await readFile(filePath, "utf-8");
+        }
+      }
 
-    switch (format) {
-      case "json":
-        console.log(JSON.stringify(result, null, 2));
-        break;
-      case "csv":
-        console.log(formatCSV(result));
-        break;
-      case "md":
-      case "markdown":
-        console.log(formatMarkdown(result));
-        break;
+      const query = load(resolvedQuery) as BaseQuery;
+      const result = executeQuery(files, query);
+      console.log(formatResult(result, format));
+    } else {
+      const thisFile = markdownPath
+        ? findThisFile(files, resolvedDir, markdownPath)
+        : undefined;
+      const output = await replaceBaseCodeBlocks(markdownInput, {
+        files,
+        format,
+        baseDir: markdownDir,
+        thisFile,
+        readStdin: markdownPath === "-" ? undefined : readStdin,
+      });
+      console.log(output);
     }
   } catch (error) {
     console.error("Error:", error instanceof Error ? error.message : error);
     process.exit(1);
   }
-}
-
-function formatCSV(result: QueryResult): string {
-  const header = result.columns.map((col) => col.displayName);
-  const records = result.rows.map((row) =>
-    result.columns.map((col) => row[col.id] ?? "")
-  );
-
-  return stringify([header, ...records]);
-}
-
-function formatMarkdown(result: QueryResult): string {
-  const table: any = {
-    type: "table",
-    children: [
-      {
-        type: "tableRow",
-        children: result.columns.map((col) => ({
-          type: "tableCell",
-          children: [{ type: "text", value: col.displayName }],
-        })),
-      },
-      ...result.rows.map((row) => ({
-        type: "tableRow",
-        children: result.columns.map((col) => ({
-          type: "tableCell",
-          children: [{ type: "text", value: String(row[col.id] ?? "") }],
-        })),
-      })),
-    ],
-  };
-
-  return toMarkdown(table, {
-    extensions: [gfmTableToMarkdown()] as any,
-  }).trim();
 }
 
 async function readStdin(): Promise<string> {
@@ -122,6 +122,21 @@ async function readStdin(): Promise<string> {
     chunks.push(chunk);
   }
   return Buffer.concat(chunks).toString("utf-8");
+}
+
+function findThisFile(
+  files: ObsidianFile[],
+  vaultRoot: string,
+  markdownPath: string
+): ObsidianFile | undefined {
+  if (markdownPath === "-") {
+    return undefined;
+  }
+  const relPath = relative(vaultRoot, resolve(markdownPath)).replace(
+    /\\/g,
+    "/"
+  );
+  return files.find((file) => file.file.path === relPath);
 }
 
 main();

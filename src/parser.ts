@@ -79,6 +79,11 @@ async function scanDirectory(
         }
       }
 
+      const titleDefault = relativePath;
+      if (frontmatter.title === undefined) {
+        frontmatter.title = titleDefault;
+      }
+
       const fileTags = (() => {
         const tags = frontmatter.tags;
         if (!tags) return [];

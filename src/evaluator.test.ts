@@ -50,9 +50,8 @@ describe("evaluateExpression", () => {
   });
 
   it("should evaluate file.asLink", () => {
-    const result = evaluateExpression("file.asLink(title)", mockFile) as Link;
-    assert.ok(result instanceof Link);
-    assert.strictEqual(result.toString(), "[[Test|Test Note]]");
+    const result = evaluateExpression("file.asLink(title)", mockFile) as string;
+    assert.strictEqual(result, "[Test Note](Test.md)");
   });
 
   it("should evaluate frontmatter properties", () => {
