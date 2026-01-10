@@ -187,6 +187,11 @@ export const arrayExtensions = {
 
 // Date extensions
 export const dateExtensions = {
+  date(this: Date | string): Date {
+    const d = dayjs(this);
+    return d.startOf("day").toDate();
+  },
+
   format(this: Date | string, format: string): string {
     return dayjs(this).format(format);
   },

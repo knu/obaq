@@ -18,27 +18,35 @@ export function executeQuery(
     return { columns: [], rows: [] };
   }
 
-  const computedRows: Row[] = applyFilter(files, view.filters, thisContext).map(
-    (file) => {
-      const row: Row = {};
+  const computedRows: Row[] = applyFilter(
+    files,
+    view.filters,
+    thisContext,
+    files
+  ).map((file) => {
+    const row: Row = {};
 
-      if (query.formulas) {
-        for (const [key, expr] of Object.entries(query.formulas)) {
-          const formulaKey = `formula.${key}`;
-          row[formulaKey] = evaluateExpression(expr, file, thisContext ?? file);
-        }
+    if (query.formulas) {
+      for (const [key, expr] of Object.entries(query.formulas)) {
+        const formulaKey = `formula.${key}`;
+        row[formulaKey] = evaluateExpression(
+          expr,
+          file,
+          thisContext ?? file,
+          files
+        );
       }
-
-      for (const [key, value] of Object.entries(file)) {
-        if (key !== "file" && key !== "content") {
-          row[`note.${key}`] = value;
-        }
-      }
-
-      row._file = file;
-      return row;
     }
-  );
+
+    for (const [key, value] of Object.entries(file)) {
+      if (key !== "file" && key !== "content") {
+        row[`note.${key}`] = value;
+      }
+    }
+
+    row._file = file;
+    return row;
+  });
 
   if (view.sort) {
     computedRows.sort((a, b) => {

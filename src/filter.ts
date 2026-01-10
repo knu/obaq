@@ -4,20 +4,29 @@ import { evaluateExpression } from "./evaluator.js";
 export function applyFilter(
   files: ObsidianFile[],
   filter: Filter | undefined,
-  thisContext?: ObsidianFile
+  thisContext?: ObsidianFile,
+  vaultFiles?: ObsidianFile[]
 ): ObsidianFile[] {
   if (!filter) return files;
-  return files.filter((file) => matchesFilter(file, filter, thisContext));
+  return files.filter((file) =>
+    matchesFilter(file, filter, thisContext, vaultFiles)
+  );
 }
 
 function matchesFilter(
   file: ObsidianFile,
   filter: Filter,
-  thisContext?: ObsidianFile
+  thisContext?: ObsidianFile,
+  vaultFiles?: ObsidianFile[]
 ): boolean {
   if (typeof filter === "string") {
     try {
-      return !!evaluateExpression(filter, file, thisContext ?? file);
+      return !!evaluateExpression(
+        filter,
+        file,
+        thisContext ?? file,
+        vaultFiles
+      );
     } catch {
       return false;
     }
@@ -25,19 +34,19 @@ function matchesFilter(
 
   if ("not" in filter) {
     return !filter.not.some((condition) =>
-      matchesFilter(file, condition, thisContext)
+      matchesFilter(file, condition, thisContext, vaultFiles)
     );
   }
 
   if ("and" in filter) {
     return filter.and.every((condition) =>
-      matchesFilter(file, condition, thisContext)
+      matchesFilter(file, condition, thisContext, vaultFiles)
     );
   }
 
   if ("or" in filter) {
     return filter.or.some((condition) =>
-      matchesFilter(file, condition, thisContext)
+      matchesFilter(file, condition, thisContext, vaultFiles)
     );
   }
 
