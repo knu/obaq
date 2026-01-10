@@ -16,17 +16,42 @@ import {
 import type { BaseQuery, ObsidianFile } from "./types.js";
 
 async function main() {
-  const { values, positionals } = parseArgs({
-    options: {
-      d: { type: "string" },
-      directory: { type: "string" },
-      e: { type: "string" },
-      eval: { type: "string" },
-      f: { type: "string" },
-      format: { type: "string" },
-    },
-    allowPositionals: true,
-  });
+  let values: {
+    d?: string;
+    directory?: string;
+    e?: string;
+    eval?: string;
+    f?: string;
+    format?: string;
+    h?: boolean;
+    help?: boolean;
+  };
+  let positionals: string[];
+  try {
+    ({ values, positionals } = parseArgs({
+      options: {
+        d: { type: "string" },
+        directory: { type: "string" },
+        e: { type: "string" },
+        eval: { type: "string" },
+        f: { type: "string" },
+        format: { type: "string" },
+        h: { type: "boolean" },
+        help: { type: "boolean" },
+      },
+      allowPositionals: true,
+    }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error: ${message}`);
+    printHelp();
+    process.exit(1);
+  }
+
+  if (values.h || values.help) {
+    printHelp();
+    process.exit(0);
+  }
 
   const vaultDir = values.d || values.directory;
   const queryYaml = values.e || values.eval;
@@ -34,11 +59,7 @@ async function main() {
   const formatOverride = values.f || values.format;
 
   if (!queryYaml && !markdownPath) {
-    console.error(
-      `Usage: obaq [-d|--directory VAULT_DIR] [-f|--format ${SUPPORTED_FORMATS.join(
-        "|"
-      )}] (-e|--eval YAML | PATH.md)`
-    );
+    printHelp();
     process.exit(1);
   }
 
@@ -137,6 +158,22 @@ function findThisFile(
     "/"
   );
   return files.find((file) => file.file.path === relPath);
+}
+
+function printHelp() {
+  const formats = SUPPORTED_FORMATS.join("|");
+  console.log(`Usage: obaq [options] (-e YAML | PATH.md)
+
+Options:
+  -d, --directory VAULT_DIR   Vault directory (defaults to cwd and auto-detects)
+  -e, --eval YAML             YAML query string or @file.base (use @- for stdin)
+  -f, --format FORMAT         Output format: ${formats}
+  -h, --help                  Show this help
+
+Notes:
+  - Specify either -e/--eval or a Markdown file, not both.
+  - Use "-" as PATH.md to read Markdown from stdin.
+`);
 }
 
 main();
