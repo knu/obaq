@@ -2,6 +2,15 @@
 
 CLI query processor for Obsidian Bases
 
+This tool aims to process Base queries with compatibility against the Obsidian Bases specifications.
+For authoritative behavior and examples, refer to the official Obsidian documentation:
+```
+https://help.obsidian.md/bases
+https://help.obsidian.md/bases/syntax
+https://help.obsidian.md/bases/functions
+https://help.obsidian.md/formulas
+```
+
 ## Installation
 
 ```sh
@@ -12,12 +21,15 @@ npm run build
 ## Usage
 
 ```sh
-obaq [-d VAULT_DIR] -e YAML [-f FORMAT]
+obaq [-d VAULT_DIR] [-f FORMAT] (-e YAML | PATH.md)
 ```
 
-- `-d|--directory VAULT_DIR`: Path to the Obsidian vault directory (defaults to current directory, searches for vault root)
-- `-e|--eval YAML`: YAML query string or `@file.base` to load from file
-- `-f|--format FORMAT`: Output format: `json` (default), `csv`, `md`, or `markdown`
+- `-d|--directory VAULT_DIR`: Path to the Obsidian vault directory (defaults to current directory, searches for vault root).
+- `-e|--eval YAML`: YAML query string or `@file.base` to load from file (use `@-` for stdin).
+- `PATH.md`: Markdown file containing `\`\`\`base` blocks to evaluate and replace (use `-` for stdin).
+- `-f|--format FORMAT`: Output format: `json` (default for `-e`), `csv`, `md`, or `markdown` (default for `PATH.md`).
+
+Specify either `-e/--eval` or a Markdown file.  You cannot use both at once.
 
 ## Output Format
 
@@ -34,7 +46,7 @@ The tool outputs JSON with the following structure:
   ],
   "rows": [
     {
-      "formula.title": "[[Note Title]]",
+      "formula.title": "[Note Title](Notes/Note%20Title.md)",
       "formula.updated": "2024-01-20T14:45:00.000Z",
       "note.created": "2024-01-15T10:30:00.000Z"
     }
@@ -57,7 +69,7 @@ The tool supports YAML queries with the following structure:
 ```yaml
 formulas:
   title: file.asLink(title)
-  updated: updated.replace(/T(.+)Z/, " $1")
+  updated: updated.format("YYYY-MM-DD HH:mm:ss")
 properties:
   formula.title:
     displayName: Title
@@ -81,11 +93,11 @@ views:
 ```
 
 ### Formulas
-JavaScript expressions evaluated in the context of each file:
+JavaScript-like expressions evaluated in the context of each file:
 - `file.name`: File name without extension
 - `file.folder`: Folder path
 - `file.path`: Full relative path
-- `file.asLink(title)`: Generate Obsidian link
+- `file.asLink(title)`: Generate a Markdown link
 - All frontmatter properties are available as variables
 
 ### Filters
@@ -99,13 +111,10 @@ filters:
 
 ### Note on Date Handling
 
-YAML datetime values are converted to local timezone ISO 8601 strings (e.g., `2024-01-20T14:45:00+09:00`).
-
-To extract just the time portion, use:
+YAML datetime values are preserved as `Date` instances when parsed from frontmatter.  Format them explicitly when needed:
 ```yaml
-updated: updated.replace(/T([^+]+)\+.+$/, " $1")
+updated: updated.format("YYYY-MM-DD HH:mm:ss")
 ```
-Result: `2024-01-20 14:45:00`
 
 ## Examples
 
@@ -118,6 +127,12 @@ node dist/cli.js -d test-vault -e "$(cat test-vault/query.base)"
 
 # Query from file (inside vault)
 node dist/cli.js -d test-vault -e @test-vault/query.base
+
+# Process a Markdown file containing ```base blocks
+node dist/cli.js -d test-vault test-vault/query.md
+
+# Process stdin as Markdown (uses cwd as base)
+cat test-vault/query.md | node dist/cli.js - -f markdown
 
 # Output as CSV
 node dist/cli.js -d test-vault -e @test-vault/query.base -f csv
