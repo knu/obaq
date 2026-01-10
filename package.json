@@ -24,9 +24,9 @@
   "license": "BSD-2-Clause",
   "dependencies": {
     "csv-stringify": "^6.6.0",
-    "dayjs": "^1.11.18",
+    "dayjs": "^1.11.19",
     "gray-matter": "^4.0.3",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-to-markdown": "^2.1.2",
     "mdast-util-wiki-link": "^0.1.2",
@@ -36,8 +36,10 @@
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.8.1",
-    "prettier": "^3.6.2",
+    "@types/node": "^25.0.5",
+    "@typescript-eslint/parser": "^8.52.0",
+    "eslint": "^9.39.2",
+    "prettier": "^3.7.4",
     "typescript": "^5.9.3"
   }
 }
