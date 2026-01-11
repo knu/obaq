@@ -2,15 +2,22 @@ import { stringify } from "csv-stringify/sync";
 import { toMarkdown } from "mdast-util-to-markdown";
 import { gfmTableToMarkdown } from "mdast-util-gfm-table";
 import { toMarkdown as wikiLinkToMarkdown } from "mdast-util-wiki-link";
+import stringWidth from "string-width";
 import type { QueryResult } from "./types.js";
 import { Link } from "./functions.js";
 
 export const SUPPORTED_FORMATS = ["json", "csv", "md", "markdown"] as const;
 export type OutputFormat = (typeof SUPPORTED_FORMATS)[number];
+export type TitleWidthMode = "markup" | "title";
+
+export interface FormatOptions {
+  titleWidth?: TitleWidthMode;
+}
 
 export function formatResult(
   result: QueryResult,
-  format: OutputFormat
+  format: OutputFormat,
+  options: FormatOptions = {}
 ): string {
   switch (format) {
     case "json":
@@ -19,7 +26,7 @@ export function formatResult(
       return formatCSV(result);
     case "md":
     case "markdown":
-      return formatMarkdown(result);
+      return formatMarkdown(result, options);
   }
 }
 
@@ -54,10 +61,12 @@ function formatCSV(result: QueryResult): string {
   return stringify([header, ...records]);
 }
 
-function formatMarkdown(result: QueryResult): string {
+function formatMarkdown(result: QueryResult, options: FormatOptions): string {
   return toMarkdown(buildMarkdownTable(result), {
     extensions: [
-      gfmTableToMarkdown(),
+      gfmTableToMarkdown({
+        stringLength: createTableStringLength(options.titleWidth),
+      }),
       wikiLinkToMarkdown({ aliasDivider: "|" }),
     ] as any,
   }).trim();
@@ -117,4 +126,23 @@ function wikiLinkNode(path: string, display?: string): any {
       permalink: path,
     },
   };
+}
+
+export function createTableStringLength(titleWidth?: TitleWidthMode) {
+  if (titleWidth !== "title") {
+    return stringWidth;
+  }
+
+  return (value: string) => {
+    const title = extractLinkTitle(value);
+    return stringWidth(title ?? value);
+  };
+}
+
+function extractLinkTitle(value: string): string | undefined {
+  const wiki = parseWikiLink(value);
+  if (wiki) return wiki.display ?? wiki.path;
+  const markdown = parseMarkdownLink(value);
+  if (markdown) return markdown.text;
+  return undefined;
 }

@@ -29,6 +29,7 @@ obaq [-d VAULT_DIR] [-f FORMAT] (-e YAML | PATH.md)
 - `-t|--this PATH`: File path to use as the `this` context for base queries.
 - `PATH.md`: Markdown file containing `\`\`\`base` blocks to evaluate and replace (use `-` for stdin).
 - `-f|--format FORMAT`: Output format: `json` (default for `-e`), `csv`, `md`, or `markdown` (default for `PATH.md`).
+- `--title-width MODE`: Table width calculation for Markdown output: `markup` (default) or `title`.
 
 Specify either `-e/--eval` or a Markdown file.  You cannot use both at once.
 

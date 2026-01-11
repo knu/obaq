@@ -9,6 +9,7 @@ import { toMarkdown as wikiLinkToMarkdown } from "mdast-util-wiki-link";
 import { executeQuery } from "./query.js";
 import {
   buildMarkdownTable,
+  createTableStringLength,
   formatResult,
   type OutputFormat,
 } from "./output.js";
@@ -19,6 +20,7 @@ interface ReplaceOptions {
   format: OutputFormat;
   baseDir: string;
   thisFile?: ObsidianFile;
+  titleWidth?: "markup" | "title";
   readStdin?: () => Promise<string>;
   readFile?: (path: string) => Promise<string>;
 }
@@ -33,7 +35,9 @@ export async function replaceBaseCodeBlocks(
   await replaceNodes(tree, options, fileReader);
   return toMarkdown(tree, {
     extensions: [
-      gfmTableToMarkdown(),
+      gfmTableToMarkdown({
+        stringLength: createTableStringLength(options.titleWidth),
+      }),
       wikiLinkToMarkdown({ aliasDivider: "|" }),
     ] as any,
   });

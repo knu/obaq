@@ -23,6 +23,7 @@ async function main() {
     eval?: string;
     f?: string;
     format?: string;
+    "title-width"?: string;
     t?: string;
     this?: string;
     version?: boolean;
@@ -47,6 +48,7 @@ async function main() {
         eval: { type: "string" },
         f: { type: "string" },
         format: { type: "string" },
+        "title-width": { type: "string" },
         t: { type: "string" },
         this: { type: "string" },
         version: { type: "boolean" },
@@ -76,6 +78,7 @@ async function main() {
   const queryYaml = values.e || values.eval;
   const markdownPath = positionals[0];
   const formatOverride = values.f || values.format;
+  const titleWidth = values["title-width"] ?? "markup";
   const thisPath = values.t || values.this;
 
   if (!queryYaml && !markdownPath) {
@@ -97,6 +100,11 @@ async function main() {
 
   const format = (formatOverride ||
     (markdownPath ? "markdown" : "json")) as OutputFormat;
+
+  if (titleWidth !== "markup" && titleWidth !== "title") {
+    console.error("Error: --title-width must be 'markup' or 'title'.");
+    process.exit(1);
+  }
 
   const markdownInput =
     markdownPath === "-"
@@ -142,13 +150,16 @@ async function main() {
 
       const query = load(resolvedQuery) as BaseQuery;
       const result = executeQuery(files, query, thisFile);
-      console.log(formatResult(result, format));
+      console.log(
+        formatResult(result, format, { titleWidth: titleWidth as any })
+      );
     } else {
       const output = await replaceBaseCodeBlocks(markdownInput, {
         files,
         format,
         baseDir: markdownDir,
         thisFile,
+        titleWidth: titleWidth as any,
         readStdin: markdownPath === "-" ? undefined : readStdin,
       });
       console.log(output);
@@ -205,6 +216,7 @@ Options:
   -d, --directory VAULT_DIR   Vault directory (defaults to cwd and auto-detects)
   -e, --eval YAML             YAML query string or @file.base (use @- for stdin)
   -f, --format FORMAT         Output format: ${formats}
+      --title-width MODE      Table width: markup|title (default: markup)
   -t, --this PATH             Use PATH as the "this" file context
       --version               Show version
   -h, --help                  Show this help
