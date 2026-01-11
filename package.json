@@ -1,6 +1,6 @@
 {
   "name": "obaq",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "CLI query processor for Obsidian Bases",
   "type": "module",
   "main": "dist/index.js",

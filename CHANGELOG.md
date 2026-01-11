@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.2
 - Add `--title-width` to control Markdown table width calculations for links.
 - Use `string-width` for display-width alignment (emoji and fullwidth aware).
 
