@@ -3,16 +3,8 @@ import { resolve } from "node:path";
 import { load } from "js-yaml";
 import { remark } from "remark";
 import remarkParse from "remark-parse";
-import { toMarkdown } from "mdast-util-to-markdown";
-import { gfmTableToMarkdown } from "mdast-util-gfm-table";
-import { toMarkdown as wikiLinkToMarkdown } from "mdast-util-wiki-link";
 import { executeQuery } from "./query.js";
-import {
-  buildMarkdownTable,
-  createTableStringLength,
-  formatResult,
-  type OutputFormat,
-} from "./output.js";
+import { formatResult, type OutputFormat } from "./output.js";
 import type { BaseQuery, ObsidianFile } from "./types.js";
 
 interface ReplaceOptions {
@@ -32,54 +24,43 @@ export async function replaceBaseCodeBlocks(
   const fileReader =
     options.readFile ?? ((path: string) => readFile(path, "utf-8"));
   const tree = remark().use(remarkParse).parse(markdown) as any;
-  await replaceNodes(tree, options, fileReader);
-  return toMarkdown(tree, {
-    extensions: [
-      gfmTableToMarkdown({
-        stringLength: createTableStringLength(options.titleWidth),
-      }),
-      wikiLinkToMarkdown({ aliasDivider: "|" }),
-    ] as any,
-  });
-}
+  const blocks = collectBaseBlocks(tree);
+  if (blocks.length === 0) return markdown;
 
-async function replaceNodes(
-  node: any,
-  options: ReplaceOptions,
-  readFileFn: (path: string) => Promise<string>
-): Promise<void> {
-  if (!node || !node.children) {
-    return;
-  }
-
-  const nextChildren: any[] = [];
-  for (const child of node.children) {
-    if (child?.type === "code" && child.lang === "base") {
-      const queryYaml = await resolveQuerySource(child.value ?? "", {
+  const frontmatterEnd = detectFrontmatterEnd(markdown);
+  const lineOffsets = buildLineOffsets(markdown);
+  const replacements = await Promise.all(
+    blocks.map(async (block) => {
+      const queryYaml = await resolveQuerySource(block.content ?? "", {
         baseDir: options.baseDir,
-        readFile: readFileFn,
+        readFile: fileReader,
         readStdin: options.readStdin,
       });
       const query = load(queryYaml) as BaseQuery;
       const result = executeQuery(options.files, query, options.thisFile);
+      const rendered =
+        options.format === "md" || options.format === "markdown"
+          ? formatResult(result, "markdown", {
+              titleWidth: options.titleWidth,
+            })
+          : wrapFenced(formatResult(result, options.format), options.format);
 
-      if (options.format === "md" || options.format === "markdown") {
-        nextChildren.push(buildMarkdownTable(result));
-      } else {
-        nextChildren.push({
-          type: "code",
-          lang: options.format,
-          value: formatResult(result, options.format),
-        });
+      const start = getOffset(block.start, lineOffsets);
+      const end = getOffset(block.end, lineOffsets);
+      if (frontmatterEnd !== undefined && start < frontmatterEnd) {
+        return null;
       }
-      continue;
-    }
+      return { start, end, rendered };
+    })
+  );
 
-    await replaceNodes(child, options, readFileFn);
-    nextChildren.push(child);
-  }
-
-  node.children = nextChildren;
+  return applyReplacements(
+    markdown,
+    replacements.filter(
+      (item): item is { start: number; end: number; rendered: string } =>
+        Boolean(item)
+    )
+  );
 }
 
 async function resolveQuerySource(
@@ -105,4 +86,77 @@ async function resolveQuerySource(
 
   const filePath = resolve(options.baseDir, ref);
   return options.readFile(filePath);
+}
+
+function collectBaseBlocks(node: any) {
+  const blocks: {
+    start: Position;
+    end: Position;
+    content: string;
+  }[] = [];
+
+  visit(node, (child) => {
+    if (child?.type === "code" && child.lang === "base" && child.position) {
+      blocks.push({
+        start: child.position.start,
+        end: child.position.end,
+        content: child.value ?? "",
+      });
+    }
+  });
+
+  return blocks;
+}
+
+function visit(node: any, fn: (child: any) => void) {
+  fn(node);
+  if (node?.children) {
+    for (const child of node.children) {
+      visit(child, fn);
+    }
+  }
+}
+
+type Position = { line: number; column: number; offset?: number };
+
+function buildLineOffsets(text: string): number[] {
+  const offsets = [0];
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === "\n") {
+      offsets.push(i + 1);
+    }
+  }
+  return offsets;
+}
+
+function getOffset(pos: Position, lineOffsets: number[]): number {
+  if (typeof pos.offset === "number") return pos.offset;
+  const lineIndex = Math.max(pos.line - 1, 0);
+  const lineOffset = lineOffsets[lineIndex] ?? 0;
+  return lineOffset + Math.max(pos.column - 1, 0);
+}
+
+function applyReplacements(
+  text: string,
+  replacements: { start: number; end: number; rendered: string }[]
+): string {
+  const sorted = [...replacements].sort((a, b) => b.start - a.start);
+  let output = text;
+  for (const replacement of sorted) {
+    output =
+      output.slice(0, replacement.start) +
+      replacement.rendered +
+      output.slice(replacement.end);
+  }
+  return output;
+}
+
+function wrapFenced(content: string, lang: string): string {
+  return ["```" + lang, content, "```"].join("\n");
+}
+
+function detectFrontmatterEnd(text: string): number | undefined {
+  const match = text.match(/^---\r?\n[\s\S]*?\r?\n(?:---|\.\.\.)\r?\n/);
+  if (!match) return undefined;
+  return match[0].length;
 }

@@ -145,4 +145,39 @@ describe("replaceBaseCodeBlocks", () => {
     assert.ok(!output.includes("[ChatGPT Report](ChatGPT.md)"));
     assert.ok(!output.includes("Third Note"));
   });
+
+  it("preserves frontmatter and wiki links", async () => {
+    const markdown = [
+      "---",
+      "title: Front Title",
+      "note: |",
+      "  ```base",
+      "  views:",
+      "    - type: table",
+      "  ```",
+      "---",
+      "",
+      "See [[NoteB]] for details.",
+      "",
+      "```base",
+      "views:",
+      "  - type: table",
+      "    name: Test",
+      "    order:",
+      "      - note.title",
+      "```",
+      "",
+    ].join("\n");
+
+    const output = await replaceBaseCodeBlocks(markdown, {
+      files: mockFiles,
+      format: "markdown",
+      baseDir: "/repo",
+    });
+
+    assert.ok(output.startsWith("---\n"));
+    assert.ok(output.includes("title: Front Title"));
+    assert.ok(output.includes("See [[NoteB]] for details."));
+    assert.ok(output.includes("| note.title |"));
+  });
 });
