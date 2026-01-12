@@ -57,6 +57,12 @@ Key bindings (in `gfm-view-mode` via `obaq-view-mode`):
   executable, the block is left unchanged.  Environment variables
   `CODE_FENCE` and `CODE_LANGUAGE` are set for the command.
 
+- `obaq-auto-view-enter-p`
+
+  Automatically enter `obaq-view-mode` when enabling
+  `obaq-buffer-mode` and renderable blocks are present.  Auto-enter
+  runs once per buffer, even across major mode changes.
+
 ## License
 
 Licensed under the 2-clause BSD license.  See LICENSE for details.

@@ -74,7 +74,17 @@ CODE_LANGUAGE are set to the fence line and language name."
   :type 'boolean
   :group 'obaq)
 
+(defcustom obaq-auto-view-enter-p nil
+  "Automatically enter `obaq-view-mode' when renderable blocks exist.
+When non-nil, enabling `obaq-buffer-mode' will automatically switch into
+`obaq-view-mode' if the buffer contains renderable base or formatter
+blocks.  Auto-enter runs once per buffer, even across major mode changes."
+  :type 'boolean
+  :group 'obaq)
+
 (defvar obaq-view-mode)
+(defvar-local obaq-mode--auto-view-entered-p nil)
+(put 'obaq-mode--auto-view-entered-p 'permanent-local t)
 
 (defun obaq-mode--buffer-path ()
   "Return the absolute path for the current buffer."
@@ -432,7 +442,13 @@ CODE_LANGUAGE are set to the fence line and language name."
 (define-minor-mode obaq-buffer-mode
   "Minor mode for obaq keybindings in gfm-mode buffers."
   :lighter " obaq"
-  :keymap obaq-buffer-mode-map)
+  :keymap obaq-buffer-mode-map
+  (when obaq-buffer-mode
+    (when (and obaq-auto-view-enter-p
+               (not obaq-mode--auto-view-entered-p)
+               (obaq-mode-renderable-blocks-exist-p))
+      (setq-local obaq-mode--auto-view-entered-p t)
+      (obaq-view-enter))))
 
 ;;;###autoload
 (define-minor-mode obaq-view-mode
