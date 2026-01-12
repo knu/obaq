@@ -39,9 +39,24 @@ Key bindings (in `gfm-view-mode` via `obaq-view-mode`):
 
 ## Customization
 
-- `obaq-mode-command`  Path or command name for the `obaq` CLI.
-- `obaq-mode-format`   Output format (default: `markdown`).
+- `obaq-mode-command`
+
+  Path or command name for the `obaq` CLI.
+
+- `obaq-mode-format`
+
+  Output format (default: `markdown`).
+
+- `obaq-enable-code-block-formatter-p`
+
+  When non-nil, code fences like ` ```lang formatter=NAME ` are
+  replaced by the output of the executable at `VAULT/.bin/NAME` (VAULT
+  is `obsidian-directory`).  The block contents are sent on stdin and
+  the command output is inserted as markdown.  The formatter runs only
+  in `obaq-view-mode`.  If the executable is missing or not
+  executable, the block is left unchanged.  Environment variables
+  `CODE_FENCE` and `CODE_LANGUAGE` are set for the command.
 
 ## License
 
-BSD 2-Clause.  See `LICENSE`.
+Licensed under the 2-clause BSD license.  See LICENSE for details.

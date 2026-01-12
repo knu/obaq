@@ -62,6 +62,18 @@
   :type 'string
   :group 'obaq)
 
+(defcustom obaq-enable-code-block-formatter-p nil
+  "Enable formatter execution for code blocks with formatter attributes.
+When non-nil, code fences like ```lang formatter=NAME are replaced by
+the output of the executable at VAULT/.bin/NAME (VAULT is
+`obsidian-directory').  The block contents are sent on stdin and the
+command output is inserted as markdown.  The formatter is invoked only
+in `obaq-view-mode'; if the executable is missing or not executable,
+the block is left unchanged.  The environment variables CODE_FENCE and
+CODE_LANGUAGE are set to the fence line and language name."
+  :type 'boolean
+  :group 'obaq)
+
 (defvar obaq-view-mode)
 
 (defun obaq-mode--buffer-path ()
@@ -104,6 +116,53 @@
               (goto-char (point-max))))))
       (nreverse blocks))))
 
+(defun obaq-mode--formatter-info (line)
+  "Return formatter info plist from a code fence LINE, or nil."
+  (save-match-data
+    (when (string-match "^```[ \t]*\\([^ \t\n]*\\)\\(.*\\)$" line)
+      (let ((lang (match-string 1 line))
+            (attrs (match-string 2 line)))
+        (when (and (not (string-empty-p lang))
+                   (not (string= lang "base"))
+                   (string-match "\\bformatter=\\([A-Za-z0-9_.-]+\\)\\b" attrs))
+          (list :lang lang
+                :formatter (match-string 1 attrs)
+                :fence line))))))
+
+(defun obaq-mode--formatter-blocks ()
+  "Return a list of formatter block plists in the current buffer."
+  (save-excursion
+    (goto-char (point-min))
+    (let (blocks)
+      (while (re-search-forward "^```" nil t)
+        (let* ((block-start (match-beginning 0))
+               (line (buffer-substring-no-properties
+                      (line-beginning-position)
+                      (line-end-position)))
+               (info (obaq-mode--formatter-info line)))
+          (when info
+            (forward-line 1)
+            (let ((content-start (point)))
+              (if (re-search-forward "^```[ \t]*$" nil t)
+                  (let* ((content-end (match-beginning 0))
+                         (block-end (match-end 0))
+                         (content (buffer-substring-no-properties
+                                   content-start
+                                   content-end))
+                         (raw (buffer-substring-no-properties
+                               block-start
+                               block-end)))
+                    (push (list :start block-start
+                                :end block-end
+                                :content content
+                                :raw raw
+                                :formatter (plist-get info :formatter)
+                                :fence-line (plist-get info :fence)
+                                :lang (plist-get info :lang))
+                          blocks))
+                (goto-char (point-max)))))))
+      (nreverse blocks))))
+
 (defun obaq-mode--block-at-point ()
   "Return the base block plist at point, or nil."
   (let ((pos (point)))
@@ -111,6 +170,45 @@
                   (and (<= (plist-get block :start) pos)
                        (<= pos (plist-get block :end))))
                 (obaq-mode--base-blocks))))
+
+(defun obaq-mode--resolve-formatter-command (formatter vault)
+  "Return the formatter command path for FORMATTER in VAULT."
+  (expand-file-name (concat ".bin/" formatter) vault))
+
+(defun obaq-mode--format-block (block)
+  "Render formatter BLOCK by invoking the formatter command."
+  (let* ((content (plist-get block :content))
+         (formatter (plist-get block :formatter))
+         (fence-line (plist-get block :fence-line))
+         (lang (plist-get block :lang))
+         (vault obsidian-directory)
+         (buffer-path (obaq-mode--buffer-path))
+         (default-directory (file-name-directory buffer-path))
+         (command (obaq-mode--resolve-formatter-command formatter vault)))
+    (unless vault
+      (error "Missing obsidian-directory"))
+    (unless (file-executable-p command)
+      (message "obaq-mode: formatter not executable, skipped: %s" command)
+      (cl-return-from obaq-mode--format-block nil))
+    (let ((process-environment (append (list (concat "CODE_FENCE=" fence-line)
+                                             (concat "CODE_LANGUAGE=" lang))
+                                       process-environment)))
+      (with-temp-buffer
+        (let ((output-buffer (current-buffer)))
+          (with-temp-buffer
+            (insert content)
+            (let ((exit-code
+                   (call-process-region
+                    (point-min)
+                    (point-max)
+                    command
+                    nil
+                    (list output-buffer t)
+                    nil)))
+              (with-current-buffer output-buffer
+                (if (and (numberp exit-code) (zerop exit-code))
+                    (buffer-string)
+                  (error "Formatter failed: %s" (string-trim (buffer-string))))))))))))
 
 (defun obaq-mode--render-block (block)
   "Render BLOCK by invoking the obaq CLI."
@@ -245,11 +343,30 @@
 
 (defun obaq-mode--render-all ()
   "Render all base blocks in the current buffer."
-  (let ((blocks (obaq-mode--base-blocks)))
-    (when blocks
-      (dolist (block (reverse blocks))
-        (obaq-mode--apply-rendered block
-                                   (obaq-mode--render-block block))))))
+  (let ((blocks (obaq-mode--base-blocks))
+        (formatter-blocks (when (and obaq-view-mode
+                                     obaq-enable-code-block-formatter-p)
+                            (obaq-mode--formatter-blocks))))
+    (when (or blocks formatter-blocks)
+      (dolist (block (sort (append blocks formatter-blocks)
+                           (lambda (left right)
+                             (> (plist-get left :start)
+                                (plist-get right :start)))))
+        (if (plist-get block :formatter)
+            (let ((rendered (obaq-mode--format-block block)))
+              (when rendered
+                (obaq-mode--apply-rendered block rendered)))
+          (obaq-mode--apply-rendered
+           block
+           (obaq-mode--render-block block)))))))
+
+;;;###autoload
+(defun obaq-mode-renderable-blocks-exist-p ()
+  "Return non-nil if the current buffer has renderable blocks."
+  (or (and (obaq-mode--base-blocks) t)
+      (and obaq-enable-code-block-formatter-p
+           (obaq-mode--formatter-blocks)
+           t)))
 
 ;;;###autoload
 (defun obaq-mode-toggle-block ()
