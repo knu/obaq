@@ -20,6 +20,7 @@
     "fetch:docs": "node scripts/fetch-docs.js",
     "format": "prettier --write 'src/**/*.ts' 'test-vault/**/*.base'",
     "lint": "eslint src --ext .ts",
+    "prepare": "npm run build",
     "test": "npm run build && node --test $(find dist -name '*.test.js')",
     "typecheck": "tsc --noEmit"
   },
