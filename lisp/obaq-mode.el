@@ -414,24 +414,29 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
 
 (defvar-local obaq-view-mode--saved-minor-mode-map-alist nil)
 (defvar-local obaq-view-mode--rendering-as-view nil)
+(defvar-local obaq-view-mode--saved-revert-buffer-function nil)
 
 (defun obaq-mode--rendering-as-view-p ()
   "Return non-nil when rendering should use view-mode settings."
-  (or (bound-and-true-p obaq-view-mode)
-      (bound-and-true-p obaq-view-mode--rendering-as-view)))
+  (or obaq-view-mode obaq-view-mode--rendering-as-view))
 
 (defun obaq-view-mode--prioritize-keymap ()
   "Move `obaq-view-mode' keymap to the front of `minor-mode-map-alist'."
   (setq-local obaq-view-mode--saved-minor-mode-map-alist
-              minor-mode-map-alist)
-  (let ((entry (assq 'obaq-view-mode minor-mode-map-alist)))
-    (unless entry
-      (setq entry (cons 'obaq-view-mode obaq-view-mode-map))
-      (setq-local minor-mode-map-alist
-                  (cons entry minor-mode-map-alist)))
-    (setq-local minor-mode-map-alist
-                (cons entry
-                      (delq entry minor-mode-map-alist)))))
+              minor-mode-map-alist
+              minor-mode-map-alist
+              (cons (or (assq 'obaq-view-mode minor-mode-map-alist)
+                        (cons 'obaq-view-mode obaq-view-mode-map))
+                    (assq-delete-all 'obaq-view-mode minor-mode-map-alist))))
+
+(defun obaq-view-mode--revert-buffer (&rest args)
+  "Revert buffer and re-enter view mode automatically."
+  (setq-local obaq-mode--auto-view-entered-p nil)
+  (let ((obaq-auto-view-enter-p t)
+        (revert-buffer-function obaq-view-mode--saved-revert-buffer-function)
+        (func (or obaq-view-mode--saved-revert-buffer-function
+                  #'revert-buffer--default)))
+    (apply func args)))
 
 ;;;###autoload
 (define-minor-mode obaq-buffer-mode
@@ -459,12 +464,19 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
                 (user-error "Obaq-view-mode requires gfm-mode or gfm-view-mode"))
               (setq needs-view-switch t))
             (obaq-view-mode--prioritize-keymap)
+            (setq-local obaq-view-mode--saved-revert-buffer-function
+                        revert-buffer-function
+                        revert-buffer-function
+                        #'obaq-view-mode--revert-buffer)
             (let ((obaq-view-mode--rendering-as-view needs-view-switch))
               (obaq-mode--render-all))
             (when needs-view-switch
               (gfm-view-mode)
               (obaq-view-mode 1)))
         (error
+         (setq-local revert-buffer-function
+                     obaq-view-mode--saved-revert-buffer-function
+                     obaq-view-mode--saved-revert-buffer-function nil)
          (when obaq-view-mode--saved-minor-mode-map-alist
            (setq-local minor-mode-map-alist
                        obaq-view-mode--saved-minor-mode-map-alist
@@ -474,7 +486,10 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
     (when obaq-view-mode--saved-minor-mode-map-alist
       (setq-local minor-mode-map-alist
                   obaq-view-mode--saved-minor-mode-map-alist
-                  obaq-view-mode--saved-minor-mode-map-alist nil))))
+                  obaq-view-mode--saved-minor-mode-map-alist nil))
+    (setq-local revert-buffer-function
+                obaq-view-mode--saved-revert-buffer-function
+                obaq-view-mode--saved-revert-buffer-function nil)))
 
 ;;;###autoload
 (defun obaq-view-enter ()
