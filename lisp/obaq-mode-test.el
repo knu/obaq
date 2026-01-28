@@ -338,10 +338,45 @@
       (should-not (obaq-mode--rendered-regions))
       (should (= 2 (length (obaq-mode--base-blocks)))))))
 
+(ert-deftest obaq-test-toggle-all-formatter-blocks ()
+  "Test toggling all formatter blocks in buffer mode."
+  (obaq-test-with-temp-buffer "# Test\n\n```js formatter=test\ncode1\n```\n\n```py formatter=black\ncode2\n```\n"
+    (let ((obaq-enable-code-block-formatter-p t))
+      (cl-letf (((symbol-function 'obaq-mode--format-block)
+                 (lambda (block) "Formatted\n"))
+                ((symbol-function 'obaq-mode--fontify-region) #'ignore))
+        (should-not obaq-view-mode)
+        (should (= 2 (length (obaq-mode--formatter-blocks))))
+        (obaq-mode-toggle-all)
+        (should (= 2 (length (obaq-mode--rendered-regions))))
+        (should-not (obaq-mode--formatter-blocks))
+        (obaq-mode-restore-all)
+        (should-not (obaq-mode--rendered-regions))
+        (should (= 2 (length (obaq-mode--formatter-blocks))))))))
+
 (ert-deftest obaq-test-toggle-block-error-when-no-block ()
   "Test that toggle-block signals error when not on a block."
   (obaq-test-with-temp-buffer "# No blocks here\n"
     (should-error (obaq-mode-toggle-block) :type 'user-error)))
+
+(ert-deftest obaq-test-restore-block ()
+  "Test restoring a single rendered block."
+  (obaq-test-with-temp-buffer "# Test\n\n```base\nquery\n```\n"
+    (cl-letf (((symbol-function 'obaq-mode--render-block)
+               (lambda (block) "Rendered\n")))
+      (search-forward "query")
+      (obaq-mode-toggle-block)
+      (should (obaq-mode--rendered-regions))
+      (search-forward "Rendered")
+      (obaq-mode-restore-block)
+      (should-not (obaq-mode--rendered-regions))
+      (should (obaq-mode--base-blocks)))))
+
+(ert-deftest obaq-test-restore-block-error-when-not-rendered ()
+  "Test that restore-block signals error when not on a rendered block."
+  (obaq-test-with-temp-buffer "# Test\n\n```base\nquery\n```\n"
+    (search-forward "query")
+    (should-error (obaq-mode-restore-block) :type 'user-error)))
 
 ;;; View mode tests
 

@@ -423,8 +423,7 @@ For formatter blocks, apply only if rendering succeeds."
 (defun obaq-mode--all-renderable-blocks ()
   "Return all renderable blocks sorted by position descending."
   (let ((blocks (obaq-mode--base-blocks))
-        (formatter-blocks (and (obaq-mode--rendering-as-view-p)
-                               obaq-enable-code-block-formatter-p
+        (formatter-blocks (and obaq-enable-code-block-formatter-p
                                (obaq-mode--formatter-blocks))))
     (sort (append blocks formatter-blocks)
           (lambda (left right)
@@ -451,36 +450,53 @@ For formatter blocks, apply only if rendering succeeds."
            (obaq-mode--formatter-block-at-point))))
 
 ;;;###autoload
-(defun obaq-mode-toggle-block ()
-  "Toggle the base block at point."
-  (interactive)
-  (cond
-   ((when-let* ((rendered (obaq-mode--rendered-region-at-point)))
-      (obaq-mode--restore-region rendered)
-      t))
-   ((when-let* ((block (obaq-mode--renderable-block-at-point)))
-      (obaq-mode--render-block-auto block)
-      t))
-   (t (user-error "No base or formatter block at point"))))
+(defun obaq-mode-toggle-block (&optional all)
+  "Toggle the block at point.
+With prefix argument ALL, toggle all blocks in the buffer."
+  (interactive "P")
+  (if all
+      (obaq-mode-toggle-all)
+    (cond
+     ((when-let* ((rendered (obaq-mode--rendered-region-at-point)))
+        (obaq-mode--restore-region rendered)
+        t))
+     ((when-let* ((block (obaq-mode--renderable-block-at-point)))
+        (obaq-mode--render-block-auto block)
+        t))
+     (t (user-error "No base or formatter block at point")))))
 
 ;;;###autoload
-(defun obaq-mode-refresh-block ()
-  "Refresh the block at point."
-  (interactive)
-  (cond
-   ((when-let* ((rendered (obaq-mode--rendered-region-at-point)))
-      (let ((start (plist-get rendered :start)))
+(defun obaq-mode-restore-block (&optional all)
+  "Restore the rendered block at point.
+With prefix argument ALL, restore all rendered blocks in the buffer."
+  (interactive "P")
+  (if all
+      (obaq-mode-restore-all)
+    (if-let* ((rendered (obaq-mode--rendered-region-at-point)))
         (obaq-mode--restore-region rendered)
-        (save-excursion
-          (goto-char start)
-          (if-let* ((block (obaq-mode--renderable-block-at-point)))
-              (obaq-mode--render-block-auto block)
-            (user-error "No base or formatter block at point"))))
-      t))
-   ((when-let* ((block (obaq-mode--renderable-block-at-point)))
-      (obaq-mode--render-block-auto block)
-      t))
-   (t (user-error "No base or formatter block at point"))))
+      (user-error "No rendered block at point"))))
+
+;;;###autoload
+(defun obaq-mode-refresh-block (&optional all)
+  "Refresh the block at point.
+With prefix argument ALL, refresh all blocks in the buffer."
+  (interactive "P")
+  (if all
+      (obaq-mode-refresh-all)
+    (cond
+     ((when-let* ((rendered (obaq-mode--rendered-region-at-point)))
+        (let ((start (plist-get rendered :start)))
+          (obaq-mode--restore-region rendered)
+          (save-excursion
+            (goto-char start)
+            (if-let* ((block (obaq-mode--renderable-block-at-point)))
+                (obaq-mode--render-block-auto block)
+              (user-error "No base or formatter block at point"))))
+        t))
+     ((when-let* ((block (obaq-mode--renderable-block-at-point)))
+        (obaq-mode--render-block-auto block)
+        t))
+     (t (user-error "No base or formatter block at point")))))
 
 ;;;###autoload
 (defun obaq-mode-toggle-all ()
@@ -530,8 +546,8 @@ For formatter blocks, apply only if rendering succeeds."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-q v") #'obaq-view-enter)
     (define-key map (kbd "C-c C-q t") #'obaq-mode-toggle-block)
-    (define-key map (kbd "C-c C-q a") #'obaq-mode-toggle-all)
-    (define-key map (kbd "C-c C-q c") #'obaq-mode-restore-all)
+    (define-key map (kbd "C-c C-q r") #'obaq-mode-refresh-block)
+    (define-key map (kbd "C-c C-q u") #'obaq-mode-restore-block)
     (define-key map (kbd "C-c C-q q") #'obaq-buffer-mode)
     map)
   "Keymap for obaq-buffer-mode.")
