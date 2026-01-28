@@ -28,7 +28,7 @@
 ;; Author: Akinori Musha <knu@iDaemons.org>
 ;; URL: https://github.com/knu/obaq
 ;; Keywords: obsidian, tools
-;; Version: 0.2.0
+;; Version: 0.2.1
 ;; Package-Requires: ((emacs "27.2"))
 
 ;;; Commentary:
