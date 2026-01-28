@@ -83,8 +83,23 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
   :group 'obaq)
 
 (defvar obaq-view-mode)
+(put 'obaq-view-mode 'permanent-local t)
 (defvar-local obaq-mode--auto-view-entered-p nil)
 (put 'obaq-mode--auto-view-entered-p 'permanent-local t)
+(defvar-local obaq-mode--reentering-major-mode nil
+  "Non-nil while re-entering major mode for display refresh.")
+(put 'obaq-mode--reentering-major-mode 'permanent-local t)
+(defvar-local obaq-mode--saving-buffer nil
+  "Non-nil while saving buffer with rendered blocks.")
+(put 'obaq-mode--saving-buffer 'permanent-local t)
+(defvar-local obaq-mode--switching-view-mode nil
+  "Non-nil while switching between gfm-mode and gfm-view-mode.")
+(put 'obaq-mode--switching-view-mode 'permanent-local t)
+(defvar-local obaq-mode--saved-revert-buffer-function nil
+  "Saved `revert-buffer-function' before obaq-buffer-mode set it.")
+(put 'obaq-mode--saved-revert-buffer-function 'permanent-local t)
+(defvar-local obaq-view-mode--rendering-as-view nil
+  "Non-nil when rendering should include formatter blocks.")
 
 (defun obaq-mode--buffer-path ()
   "Return the absolute path for the current buffer."
@@ -164,21 +179,21 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
                 (goto-char (point-max)))))))
       (nreverse blocks))))
 
-(defun obaq-mode--block-at-point ()
-  "Return the base block plist at point, or nil."
+(defun obaq-mode--block-at-point-in (blocks)
+  "Return the block at point from BLOCKS, or nil."
   (let ((pos (point)))
     (cl-find-if (lambda (block)
                   (and (<= (plist-get block :start) pos)
                        (<= pos (plist-get block :end))))
-                (obaq-mode--base-blocks))))
+                blocks)))
+
+(defun obaq-mode--block-at-point ()
+  "Return the base block plist at point, or nil."
+  (obaq-mode--block-at-point-in (obaq-mode--base-blocks)))
 
 (defun obaq-mode--formatter-block-at-point ()
   "Return the formatter block plist at point, or nil."
-  (let ((pos (point)))
-    (cl-find-if (lambda (block)
-                  (and (<= (plist-get block :start) pos)
-                       (<= pos (plist-get block :end))))
-                (obaq-mode--formatter-blocks))))
+  (obaq-mode--block-at-point-in (obaq-mode--formatter-blocks)))
 
 (defun obaq-mode--resolve-formatter-command (formatter vault)
   "Return the formatter command path for FORMATTER in VAULT."
@@ -259,35 +274,29 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
   "Return rendered region info at point, or nil."
   (let ((pos (point)))
     (and (get-text-property pos 'obaq-rendered)
-         (if-let* ((region (get-text-property pos 'obaq-region)))
-             (list :start (car region)
-                   :end (cdr region)
-                   :raw (get-text-property pos 'obaq-original))
-           (list :start (or (previous-single-property-change
-                             pos 'obaq-rendered nil (point-min))
-                            (point-min))
+         (let ((start (or (previous-single-property-change
+                           pos 'obaq-rendered nil (point-min))
+                          (point-min))))
+           (unless (get-text-property start 'obaq-rendered)
+             (setq start pos))
+           (list :start start
                  :end (or (next-single-property-change
                            pos 'obaq-rendered nil (point-max))
                           (point-max))
                  :raw (get-text-property pos 'obaq-original))))))
 
 (defun obaq-mode--rendered-regions ()
-  "Return a list of rendered region plists."
+  "Return a list of rendered region plists with current buffer positions."
   (let ((pos (point-min))
         regions)
     (while (< pos (point-max))
       (let ((next (next-single-property-change
                    pos 'obaq-rendered nil (point-max))))
         (when (get-text-property pos 'obaq-rendered)
-          (if-let* ((region (get-text-property pos 'obaq-region)))
-              (push (list :start (car region)
-                          :end (cdr region)
-                          :raw (get-text-property pos 'obaq-original))
-                    regions)
-            (push (list :start pos
-                        :end (or next (point-max))
-                        :raw (get-text-property pos 'obaq-original))
-                  regions)))
+          (push (list :start pos
+                      :end (or next (point-max))
+                      :raw (get-text-property pos 'obaq-original))
+                regions))
         (setq pos (or next (point-max)))))
     (nreverse regions)))
 
@@ -305,11 +314,41 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
             start end
             `(obaq-rendered t
                             obaq-original ,(plist-get block :raw)
-                            obaq-region ,(cons start end)
                             read-only t
-                            front-sticky (read-only obaq-rendered obaq-original obaq-region)
-                            rear-nonsticky (read-only obaq-rendered obaq-original obaq-region)))
+                            front-sticky (read-only obaq-rendered obaq-original)
+                            rear-nonsticky (read-only obaq-rendered obaq-original)))
+           (obaq-mode--refresh-display start end)
            (list :start start :end end)))))))
+
+(defun obaq-mode--fontify-region (start end)
+  "Fontify region between START and END for markdown decorations."
+  (when (and (derived-mode-p 'markdown-mode)
+             (bound-and-true-p font-lock-mode))
+    (let ((inhibit-read-only t))
+      (font-lock-flush start end)
+      (font-lock-ensure start end))))
+
+(defun obaq-mode--refresh-display (start end)
+  "Refresh display after modifying region between START and END.
+In view modes, re-enters the major mode.  Otherwise, fontifies the region."
+  (if (and (derived-mode-p '(markdown-view-mode gfm-view-mode))
+           (not obaq-mode--reentering-major-mode))
+      (let ((pos (point))
+            (win (selected-window))
+            (start-pos (window-start))
+            (mode major-mode)
+            (was-obaq-view-mode obaq-view-mode))
+        (setq obaq-mode--reentering-major-mode t)
+        (unwind-protect
+            (progn
+              (funcall mode)
+              (goto-char (min pos (point-max)))
+              (when (window-live-p win)
+                (set-window-start win start-pos t))
+              (when was-obaq-view-mode
+                (obaq-view-mode 1)))
+          (setq obaq-mode--reentering-major-mode nil)))
+    (obaq-mode--fontify-region start end)))
 
 (defun obaq-mode--restore-region (region)
   "Restore REGION to its original base block content."
@@ -322,7 +361,48 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
        (save-excursion
          (goto-char start)
          (delete-region start (plist-get region :end))
-         (insert raw))))))
+         (insert raw)
+         (obaq-mode--refresh-display start (point)))))))
+
+(defun obaq-mode--raw-base-block-p (raw)
+  "Return non-nil if RAW starts with a base code fence."
+  (and raw (string-match-p "^```[ \t]*base\\b" raw)))
+
+(defun obaq-mode--raw-formatter-block-p (raw)
+  "Return non-nil if RAW starts with a formatter code fence."
+  (and raw
+       (obaq-mode--formatter-info (car (split-string raw "\n")))
+       t))
+
+(defun obaq-mode--write-contents ()
+  "Restore rendered blocks before saving, then revert to re-render.
+This function is added to `write-contents-functions'."
+  (let* ((was-view-mode (or obaq-view-mode
+                            (derived-mode-p 'gfm-view-mode 'markdown-view-mode)))
+         (regions (obaq-mode--rendered-regions))
+         (had-formatter-blocks
+          (cl-some (lambda (r)
+                     (obaq-mode--raw-formatter-block-p (plist-get r :raw)))
+                   regions)))
+    (when (and (not obaq-mode--saving-buffer) regions)
+      (setq obaq-mode--saving-buffer t)
+      (unwind-protect
+          (progn
+            (obaq-mode-restore-all)
+            (save-buffer)
+            (setq obaq-mode--switching-view-mode t)
+            (unwind-protect
+                (let ((revert-buffer-function nil))
+                  (revert-buffer t t))
+              (setq obaq-mode--switching-view-mode nil))
+            (if was-view-mode
+                (obaq-view-enter)
+              (setq obaq-view-mode--rendering-as-view had-formatter-blocks)
+              (unwind-protect
+                  (obaq-mode--render-all)
+                (setq obaq-view-mode--rendering-as-view nil))))
+        (setq obaq-mode--saving-buffer nil))
+      t)))
 
 ;;;###autoload
 (defun obaq-mode-restore-all ()
@@ -332,21 +412,29 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
     (dolist (region (reverse regions))
       (obaq-mode--restore-region region))))
 
-(defun obaq-mode--render-all ()
-  "Render all base blocks in the current buffer."
+(defun obaq-mode--render-block-auto (block)
+  "Render BLOCK using the appropriate renderer and apply the result.
+For formatter blocks, apply only if rendering succeeds."
+  (if (plist-get block :formatter)
+      (when-let* ((rendered (obaq-mode--format-block block)))
+        (obaq-mode--apply-rendered block rendered))
+    (obaq-mode--apply-rendered block (obaq-mode--render-block block))))
+
+(defun obaq-mode--all-renderable-blocks ()
+  "Return all renderable blocks sorted by position descending."
   (let ((blocks (obaq-mode--base-blocks))
         (formatter-blocks (and (obaq-mode--rendering-as-view-p)
                                obaq-enable-code-block-formatter-p
                                (obaq-mode--formatter-blocks))))
-    (when (or blocks formatter-blocks)
-      (dolist (block (sort (append blocks formatter-blocks)
-                           (lambda (left right)
-                             (> (plist-get left :start)
-                                (plist-get right :start)))))
-        (if (plist-get block :formatter)
-            (when-let* ((rendered (obaq-mode--format-block block)))
-              (obaq-mode--apply-rendered block rendered))
-          (obaq-mode--apply-rendered block (obaq-mode--render-block block)))))))
+    (sort (append blocks formatter-blocks)
+          (lambda (left right)
+            (> (plist-get left :start)
+               (plist-get right :start))))))
+
+(defun obaq-mode--render-all ()
+  "Render all base blocks in the current buffer."
+  (dolist (block (obaq-mode--all-renderable-blocks))
+    (obaq-mode--render-block-auto block)))
 
 ;;;###autoload
 (defun obaq-mode-renderable-blocks-exist-p ()
@@ -356,6 +444,12 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
                 (obaq-mode--formatter-blocks)))
        t))
 
+(defun obaq-mode--renderable-block-at-point ()
+  "Return the renderable block (base or formatter) at point, or nil."
+  (or (obaq-mode--block-at-point)
+      (and obaq-enable-code-block-formatter-p
+           (obaq-mode--formatter-block-at-point))))
+
 ;;;###autoload
 (defun obaq-mode-toggle-block ()
   "Toggle the base block at point."
@@ -364,13 +458,27 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
    ((when-let* ((rendered (obaq-mode--rendered-region-at-point)))
       (obaq-mode--restore-region rendered)
       t))
-   ((when-let* ((block (obaq-mode--block-at-point)))
-      (obaq-mode--apply-rendered block (obaq-mode--render-block block))
+   ((when-let* ((block (obaq-mode--renderable-block-at-point)))
+      (obaq-mode--render-block-auto block)
       t))
-   ((when-let* ((formatter-block (and obaq-enable-code-block-formatter-p
-                                      (obaq-mode--formatter-block-at-point))))
-      (when-let* ((rendered (obaq-mode--format-block formatter-block)))
-        (obaq-mode--apply-rendered formatter-block rendered))
+   (t (user-error "No base or formatter block at point"))))
+
+;;;###autoload
+(defun obaq-mode-refresh-block ()
+  "Refresh the block at point."
+  (interactive)
+  (cond
+   ((when-let* ((rendered (obaq-mode--rendered-region-at-point)))
+      (let ((start (plist-get rendered :start)))
+        (obaq-mode--restore-region rendered)
+        (save-excursion
+          (goto-char start)
+          (if-let* ((block (obaq-mode--renderable-block-at-point)))
+              (obaq-mode--render-block-auto block)
+            (user-error "No base or formatter block at point"))))
+      t))
+   ((when-let* ((block (obaq-mode--renderable-block-at-point)))
+      (obaq-mode--render-block-auto block)
       t))
    (t (user-error "No base or formatter block at point"))))
 
@@ -380,18 +488,43 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
   (interactive)
   (if (obaq-mode--rendered-regions)
       (obaq-mode-restore-all)
-    (if-let* ((blocks (append (obaq-mode--base-blocks)
-                              (and obaq-enable-code-block-formatter-p
-                                   (obaq-mode--formatter-blocks)))))
-        (dolist (block (sort blocks
-                             (lambda (left right)
-                               (> (plist-get left :start)
-                                  (plist-get right :start)))))
-          (if (plist-get block :formatter)
-              (when-let* ((rendered (obaq-mode--format-block block)))
-                (obaq-mode--apply-rendered block rendered))
-            (obaq-mode--apply-rendered block (obaq-mode--render-block block))))
+    (if-let* ((blocks (obaq-mode--all-renderable-blocks)))
+        (dolist (block blocks)
+          (obaq-mode--render-block-auto block))
       (user-error "No renderable blocks found"))))
+
+;;;###autoload
+(defun obaq-mode-refresh-all ()
+  "Refresh all renderable blocks in the current buffer."
+  (interactive)
+  (let* ((regions (obaq-mode--rendered-regions))
+         (base-regions (cl-remove-if-not
+                        (lambda (region)
+                          (obaq-mode--raw-base-block-p (plist-get region :raw)))
+                        regions)))
+    (cond
+     ((obaq-mode--rendering-as-view-p)
+      (save-excursion
+        (obaq-mode-restore-all)
+        (obaq-mode--render-all)
+        (obaq-mode--refresh-display (point-min) (point-max))))
+     (base-regions
+      (save-excursion
+        (dolist (region (reverse base-regions))
+          (let ((start (plist-get region :start)))
+            (obaq-mode--restore-region region)
+            (goto-char start)
+            (when-let* ((block (obaq-mode--block-at-point)))
+              (obaq-mode--apply-rendered block (obaq-mode--render-block block)))))
+        (obaq-mode--refresh-display (point-min) (point-max))))
+     (regions
+      (obaq-mode--refresh-display (point-min) (point-max))
+      (message "No base blocks to refresh in non-view mode"))
+     ((obaq-mode--base-blocks)
+      (save-excursion
+        (obaq-mode--render-all)
+        (obaq-mode--refresh-display (point-min) (point-max))))
+     (t (user-error "No renderable blocks found")))))
 
 (defvar obaq-buffer-mode-map
   (let ((map (make-sparse-keymap)))
@@ -413,8 +546,6 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
   "Keymap for obaq-view-mode.")
 
 (defvar-local obaq-view-mode--saved-minor-mode-map-alist nil)
-(defvar-local obaq-view-mode--rendering-as-view nil)
-(defvar-local obaq-view-mode--saved-revert-buffer-function nil)
 
 (defun obaq-mode--rendering-as-view-p ()
   "Return non-nil when rendering should use view-mode settings."
@@ -429,26 +560,50 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
                         (cons 'obaq-view-mode obaq-view-mode-map))
                     (assq-delete-all 'obaq-view-mode minor-mode-map-alist))))
 
+(defun obaq-mode--revert-buffer (&rest args)
+  "Revert buffer preserving obaq-buffer-mode state.
+This function is used for `revert-buffer-function' in `obaq-buffer-mode'."
+  (let ((revert-buffer-function obaq-mode--saved-revert-buffer-function)
+        (func (or obaq-mode--saved-revert-buffer-function
+                  #'revert-buffer--default)))
+    (setq obaq-mode--switching-view-mode t)
+    (unwind-protect
+        (apply func args)
+      (setq obaq-mode--switching-view-mode nil))))
+
 (defun obaq-view-mode--revert-buffer (&rest args)
   "Revert buffer and re-enter view mode automatically."
-  (setq-local obaq-mode--auto-view-entered-p nil)
-  (let ((obaq-auto-view-enter-p t)
-        (revert-buffer-function obaq-view-mode--saved-revert-buffer-function)
-        (func (or obaq-view-mode--saved-revert-buffer-function
-                  #'revert-buffer--default)))
-    (apply func args)))
+  (setq obaq-mode--switching-view-mode t)
+  (unwind-protect
+      (progn
+        (let ((revert-buffer-function nil))
+          (apply #'revert-buffer args))
+        (obaq-view-enter))
+    (setq obaq-mode--switching-view-mode nil)))
 
 ;;;###autoload
 (define-minor-mode obaq-buffer-mode
   "Minor mode for obaq keybindings in gfm-mode buffers."
   :lighter " obaq"
   :keymap obaq-buffer-mode-map
-  (when (and obaq-buffer-mode
-             obaq-auto-view-enter-p
-             (not obaq-mode--auto-view-entered-p)
-             (obaq-mode-renderable-blocks-exist-p))
-    (setq-local obaq-mode--auto-view-entered-p t)
-    (obaq-view-enter)))
+  (if obaq-buffer-mode
+      (progn
+        (add-hook 'write-contents-functions #'obaq-mode--write-contents nil t)
+        (unless (eq revert-buffer-function #'obaq-mode--revert-buffer)
+          (setq-local obaq-mode--saved-revert-buffer-function
+                      revert-buffer-function
+                      revert-buffer-function
+                      #'obaq-mode--revert-buffer))
+        (when (and obaq-auto-view-enter-p
+                   (not obaq-mode--auto-view-entered-p)
+                   (not obaq-mode--saving-buffer)
+                   (obaq-mode-renderable-blocks-exist-p))
+          (setq-local obaq-mode--auto-view-entered-p t)
+          (obaq-view-enter)))
+    (remove-hook 'write-contents-functions #'obaq-mode--write-contents t)
+    (setq-local revert-buffer-function
+                obaq-mode--saved-revert-buffer-function
+                obaq-mode--saved-revert-buffer-function nil)))
 
 ;;;###autoload
 (define-minor-mode obaq-view-mode
@@ -457,26 +612,26 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
   :keymap obaq-view-mode-map
   (if obaq-view-mode
       (condition-case error
-          (let ((needs-view-switch nil))
-            (unless (derived-mode-p 'gfm-view-mode)
-              (unless (derived-mode-p 'gfm-mode)
-                (setq obaq-view-mode nil)
-                (user-error "Obaq-view-mode requires gfm-mode or gfm-view-mode"))
-              (setq needs-view-switch t))
+          (let ((needs-view-switch
+                 (cond
+                  ((derived-mode-p 'gfm-view-mode) nil)
+                  ((derived-mode-p 'gfm-mode) t)
+                  (t
+                   (setq obaq-view-mode nil)
+                   (user-error "Obaq-view-mode requires gfm-mode or gfm-view-mode")))))
             (obaq-view-mode--prioritize-keymap)
-            (setq-local obaq-view-mode--saved-revert-buffer-function
-                        revert-buffer-function
-                        revert-buffer-function
-                        #'obaq-view-mode--revert-buffer)
+            (setq-local revert-buffer-function #'obaq-view-mode--revert-buffer)
             (let ((obaq-view-mode--rendering-as-view needs-view-switch))
-              (obaq-mode--render-all))
+              (when (not obaq-mode--reentering-major-mode)
+                (obaq-mode--render-all)))
             (when needs-view-switch
-              (gfm-view-mode)
+              (setq obaq-mode--switching-view-mode t)
+              (unwind-protect
+                  (gfm-view-mode)
+                (setq obaq-mode--switching-view-mode nil))
               (obaq-view-mode 1)))
         (error
-         (setq-local revert-buffer-function
-                     obaq-view-mode--saved-revert-buffer-function
-                     obaq-view-mode--saved-revert-buffer-function nil)
+         (setq-local revert-buffer-function #'obaq-mode--revert-buffer)
          (when obaq-view-mode--saved-minor-mode-map-alist
            (setq-local minor-mode-map-alist
                        obaq-view-mode--saved-minor-mode-map-alist
@@ -487,9 +642,7 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
       (setq-local minor-mode-map-alist
                   obaq-view-mode--saved-minor-mode-map-alist
                   obaq-view-mode--saved-minor-mode-map-alist nil))
-    (setq-local revert-buffer-function
-                obaq-view-mode--saved-revert-buffer-function
-                obaq-view-mode--saved-revert-buffer-function nil)))
+    (setq-local revert-buffer-function #'obaq-mode--revert-buffer)))
 
 ;;;###autoload
 (defun obaq-view-enter ()
@@ -505,12 +658,20 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
   (interactive)
   (obaq-view-mode -1)
   (obaq-mode-restore-all)
-  (and (fboundp 'gfm-mode) (gfm-mode)))
+  (setq obaq-mode--switching-view-mode t)
+  (unwind-protect
+      (when (fboundp 'gfm-mode)
+        (gfm-mode))
+    (setq obaq-mode--switching-view-mode nil)))
 
 (defun obaq-mode-disable-on-major-change ()
   "Disable obaq buffer/view modes before changing major modes."
-  (and obaq-buffer-mode (obaq-buffer-mode -1))
-  (and obaq-view-mode (obaq-view-mode -1)))
+  (unless obaq-mode--switching-view-mode
+    (when obaq-buffer-mode
+      (obaq-mode-restore-all)
+      (obaq-buffer-mode -1))
+    (when obaq-view-mode
+      (obaq-view-mode -1))))
 
 ;;;###autoload
 (define-minor-mode obaq-mode
