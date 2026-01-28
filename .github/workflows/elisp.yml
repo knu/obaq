@@ -1,0 +1,36 @@
+name: Emacs Lisp
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      - "lisp/**"
+      - ".github/workflows/elisp.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "lisp/**"
+      - ".github/workflows/elisp.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        emacs-version: ["29.4", "30.2"]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Emacs ${{ matrix.emacs-version }}
+        uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs-version }}
+
+      - name: Run lint
+        run: make -C lisp lint
+
+      - name: Run tests
+        run: make -C lisp test
