@@ -28,7 +28,7 @@
 ;; Author: Akinori Musha <knu@iDaemons.org>
 ;; URL: https://github.com/knu/obaq
 ;; Keywords: obsidian, tools
-;; Version: 0.2.1
+;; Version: 0.2.2
 ;; Package-Requires: ((emacs "27.2"))
 
 ;;; Commentary:
@@ -80,6 +80,14 @@ When non-nil, enabling `obaq-buffer-mode' will automatically switch into
 `obaq-view-mode' if the buffer contains renderable base or formatter
 blocks.  Auto-enter runs once per buffer, even across major mode changes."
   :type 'boolean
+  :group 'obaq)
+
+(defface obaq-rendered-block
+  '((((background light)) :background "#f0f8ff" :extend t)
+    (((background dark)) :background "#1a2a3a" :extend t))
+  "Face for rendered obaq blocks.
+Use this to set a background color or other visual distinction
+for rendered content."
   :group 'obaq)
 
 (defvar obaq-view-mode)
@@ -309,7 +317,8 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
          (goto-char start)
          (delete-region start (plist-get block :end))
          (insert rendered)
-         (let ((end (point)))
+         (let* ((end (point))
+                (ov (make-overlay start end nil t nil)))
            (add-text-properties
             start end
             `(obaq-rendered t
@@ -317,6 +326,8 @@ blocks.  Auto-enter runs once per buffer, even across major mode changes."
                             read-only t
                             front-sticky (read-only obaq-rendered obaq-original)
                             rear-nonsticky (read-only obaq-rendered obaq-original)))
+           (overlay-put ov 'obaq-rendered t)
+           (overlay-put ov 'face 'obaq-rendered-block)
            (obaq-mode--refresh-display start end)
            (list :start start :end end)))))))
 
@@ -353,14 +364,18 @@ In view modes, re-enters the major mode.  Otherwise, fontifies the region."
 (defun obaq-mode--restore-region (region)
   "Restore REGION to its original base block content."
   (let ((raw (plist-get region :raw))
-        (start (plist-get region :start)))
+        (start (plist-get region :start))
+        (end (plist-get region :end)))
     (unless raw
       (error "Missing original base block contents"))
+    (dolist (ov (overlays-in start end))
+      (when (overlay-get ov 'obaq-rendered)
+        (delete-overlay ov)))
     (obaq-mode--with-silent-modifications
      (lambda ()
        (save-excursion
          (goto-char start)
-         (delete-region start (plist-get region :end))
+         (delete-region start end)
          (insert raw)
          (obaq-mode--refresh-display start (point)))))))
 
