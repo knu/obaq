@@ -267,7 +267,6 @@ for rendered content."
   "Run FN without marking the buffer as modified."
   (let ((inhibit-read-only t)
         (was-read-only buffer-read-only)
-        (inhibit-modification-hooks t)
         (buffer-undo-list t)
         (was-modified (buffer-modified-p)))
     (unwind-protect
@@ -345,7 +344,8 @@ for rendered content."
   "Fontify region between START and END for markdown decorations."
   (when (and (derived-mode-p 'markdown-mode)
              (bound-and-true-p font-lock-mode))
-    (let ((inhibit-read-only t))
+    (let ((inhibit-read-only t)
+          (end (min end (point-max))))
       (font-lock-flush start end)
       (font-lock-ensure start end))))
 
