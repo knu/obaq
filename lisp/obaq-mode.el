@@ -325,9 +325,19 @@ for rendered content."
                             obaq-original ,(plist-get block :raw)
                             read-only t
                             front-sticky (read-only obaq-rendered obaq-original)
-                            rear-nonsticky (read-only obaq-rendered obaq-original)))
+                            rear-nonsticky t))
            (overlay-put ov 'obaq-rendered t)
            (overlay-put ov 'face 'obaq-rendered-block)
+           ;; Hide the trailing newline after rendered block if present
+           ;; Use modification-hooks to prevent deletion
+           (when (and (< end (point-max)) (eq (char-after end) ?\n))
+             (let ((nl-ov (make-overlay end (1+ end) nil nil nil)))
+               (overlay-put nl-ov 'obaq-rendered-newline t)
+               (overlay-put nl-ov 'display "")
+               (overlay-put nl-ov 'modification-hooks
+                            (list (lambda (ov after-p beg end &optional len)
+                                    (unless after-p
+                                      (signal 'text-read-only nil)))))))
            (obaq-mode--refresh-display start end)
            (list :start start :end end)))))))
 
@@ -368,8 +378,10 @@ In view modes, re-enters the major mode.  Otherwise, fontifies the region."
         (end (plist-get region :end)))
     (unless raw
       (error "Missing original base block contents"))
-    (dolist (ov (overlays-in start end))
-      (when (overlay-get ov 'obaq-rendered)
+    ;; Delete block overlay and trailing newline overlay
+    (dolist (ov (overlays-in start (min (1+ end) (point-max))))
+      (when (or (overlay-get ov 'obaq-rendered)
+                (overlay-get ov 'obaq-rendered-newline))
         (delete-overlay ov)))
     (obaq-mode--with-silent-modifications
      (lambda ()

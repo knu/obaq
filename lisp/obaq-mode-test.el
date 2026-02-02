@@ -327,17 +327,40 @@
 
 (ert-deftest obaq-test-replace-all ()
   "Test replacing all blocks."
-  (obaq-test-with-temp-buffer "# Test\n\n```base\nq1\n```\n\n```base\nq2\n```\n"
+  (obaq-test-with-temp-buffer "# Test\n\n```base\nq1\n```\n# End\n"
     (cl-letf (((symbol-function 'obaq-mode--render-block)
                (lambda (block) "Rendered\n"))
               ((symbol-function 'obaq-mode--fontify-region) #'ignore))
-      (should (= 2 (length (obaq-mode--base-blocks))))
+      (should (= 1 (length (obaq-mode--base-blocks))))
       (obaq-mode-replace-all)
-      (should (= 2 (length (obaq-mode--rendered-regions))))
+      (should (= 1 (length (obaq-mode--rendered-regions))))
       (should-not (obaq-mode--base-blocks))
+      ;; Block does not include trailing newline, original newline remains
+      (should (string= "# Test\n\nRendered\n\n# End\n"
+                       (buffer-substring-no-properties (point-min) (point-max))))
       (obaq-mode-restore-all)
       (should-not (obaq-mode--rendered-regions))
-      (should (= 2 (length (obaq-mode--base-blocks)))))))
+      (should (= 1 (length (obaq-mode--base-blocks)))))))
+
+(ert-deftest obaq-test-insert-after-replaced-block ()
+  "Test that text can be inserted after a replaced block."
+  (obaq-test-with-temp-buffer "# Test\n\n```base\nquery\n```\n# End\n"
+    (cl-letf (((symbol-function 'obaq-mode--render-block)
+               (lambda (block) "Rendered\n"))
+              ((symbol-function 'obaq-mode--fontify-region) #'ignore))
+      (obaq-mode-replace-all)
+      (let* ((regions (obaq-mode--rendered-regions))
+             (region (car regions))
+             (end (plist-get region :end)))
+        ;; Insert at position after the hidden newline (start of # End line)
+        (goto-char (1+ end))
+        (insert "INSERTED\n")
+        ;; Inserted text should be visible (not covered by overlay)
+        (should (string= "# Test\n\nRendered\n\nINSERTED\n# End\n"
+                         (buffer-substring-no-properties (point-min) (point-max))))
+        ;; Save should preserve inserted text
+        (obaq-mode-restore-all)
+        (should (string-match-p "INSERTED" (buffer-string)))))))
 
 (ert-deftest obaq-test-replace-all-formatter-blocks ()
   "Test replacing all formatter blocks in buffer mode."
