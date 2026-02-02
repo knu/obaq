@@ -278,11 +278,28 @@
 
 (ert-deftest obaq-test-block-at-point ()
   "Test finding block at point."
-  (obaq-test-with-temp-buffer "# Test\n\n```base\nquery\n```\n"
+  ;; Buffer: "# Test\n\n```base\nquery\n```\n# End\n"
+  ;;          12345678 9      17    22  26
+  ;; Block spans from position 9 (start of ```base) to 26 (end of ```)
+  (obaq-test-with-temp-buffer "# Test\n\n```base\nquery\n```\n# End\n"
     (goto-char (point-min))
     (should-not (obaq-mode--block-at-point))
+    ;; Just before block start
+    (goto-char 8)
+    (should-not (obaq-mode--block-at-point))
+    ;; At block start
+    (goto-char 9)
+    (should (obaq-mode--block-at-point))
+    ;; Inside content
     (search-forward "query")
     (should (obaq-mode--block-at-point))
+    ;; At closing fence
+    (search-forward "```")
+    (backward-char 3)
+    (should (obaq-mode--block-at-point))
+    ;; Just after block end (at newline after ```)
+    (goto-char 27)
+    (should-not (obaq-mode--block-at-point))
     (goto-char (point-max))
     (should-not (obaq-mode--block-at-point))))
 
