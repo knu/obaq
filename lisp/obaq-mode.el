@@ -74,11 +74,11 @@ CODE_LANGUAGE are set to the fence line and language name."
   :type 'boolean
   :group 'obaq)
 
-(defcustom obaq-auto-view-enter-p nil
-  "Automatically enter `obaq-view-mode' when renderable blocks exist.
-When non-nil, enabling `obaq-buffer-mode' will automatically switch into
-`obaq-view-mode' if the buffer contains renderable base or formatter
-blocks.  Auto-enter runs once per buffer, even across major mode changes."
+(defcustom obaq-auto-replace-all-p nil
+  "Automatically replace all blocks when entering `obaq-buffer-mode'.
+When non-nil, enabling `obaq-buffer-mode' will automatically call
+`obaq-mode-replace-all' if the buffer contains renderable blocks.
+Auto-replace runs once per buffer, even across major mode changes."
   :type 'boolean
   :group 'obaq)
 
@@ -92,8 +92,8 @@ for rendered content."
 
 (defvar obaq-view-mode)
 (put 'obaq-view-mode 'permanent-local t)
-(defvar-local obaq-mode--auto-view-entered-p nil)
-(put 'obaq-mode--auto-view-entered-p 'permanent-local t)
+(defvar-local obaq-mode--auto-replaced-p nil)
+(put 'obaq-mode--auto-replaced-p 'permanent-local t)
 (defvar-local obaq-mode--reentering-major-mode nil
   "Non-nil while re-entering major mode for display refresh.")
 (put 'obaq-mode--reentering-major-mode 'permanent-local t)
@@ -632,12 +632,12 @@ This function is used for `revert-buffer-function' in `obaq-buffer-mode'."
                       revert-buffer-function
                       revert-buffer-function
                       #'obaq-mode--revert-buffer))
-        (when (and obaq-auto-view-enter-p
-                   (not obaq-mode--auto-view-entered-p)
+        (when (and obaq-auto-replace-all-p
+                   (not obaq-mode--auto-replaced-p)
                    (not obaq-mode--saving-buffer)
                    (obaq-mode-renderable-blocks-exist-p))
-          (setq-local obaq-mode--auto-view-entered-p t)
-          (obaq-view-enter)))
+          (setq-local obaq-mode--auto-replaced-p t)
+          (obaq-mode-replace-all)))
     (remove-hook 'write-contents-functions #'obaq-mode--write-contents t)
     (setq-local revert-buffer-function
                 obaq-mode--saved-revert-buffer-function
