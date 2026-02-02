@@ -18,14 +18,15 @@
 (unless (fboundp 'gfm-mode)
   (define-derived-mode gfm-mode text-mode "GFM"))
 
-(unless (fboundp 'gfm-view-mode)
-  (define-derived-mode gfm-view-mode gfm-mode "GFM-View"
-    (setq buffer-read-only t)))
-
 (unless (fboundp 'obsidian-follow-link-at-point)
   (defun obsidian-follow-link-at-point ()))
 
 (require 'obaq-mode)
+
+;; Define mock gfm-view-mode after require to override the autoload
+(when (autoloadp (symbol-function 'gfm-view-mode))
+  (define-derived-mode gfm-view-mode gfm-mode "GFM-View"
+    (setq buffer-read-only t)))
 
 (defmacro obaq-test-with-temp-buffer (content &rest body)
   "Create a temp buffer with CONTENT in gfm-mode and run BODY."
@@ -324,22 +325,22 @@
       (should-not (obaq-mode--rendered-regions))
       (should (obaq-mode--base-blocks)))))
 
-(ert-deftest obaq-test-toggle-all ()
-  "Test toggling all blocks."
+(ert-deftest obaq-test-replace-all ()
+  "Test replacing all blocks."
   (obaq-test-with-temp-buffer "# Test\n\n```base\nq1\n```\n\n```base\nq2\n```\n"
     (cl-letf (((symbol-function 'obaq-mode--render-block)
                (lambda (block) "Rendered\n"))
               ((symbol-function 'obaq-mode--fontify-region) #'ignore))
       (should (= 2 (length (obaq-mode--base-blocks))))
-      (obaq-mode-toggle-all)
+      (obaq-mode-replace-all)
       (should (= 2 (length (obaq-mode--rendered-regions))))
       (should-not (obaq-mode--base-blocks))
       (obaq-mode-restore-all)
       (should-not (obaq-mode--rendered-regions))
       (should (= 2 (length (obaq-mode--base-blocks)))))))
 
-(ert-deftest obaq-test-toggle-all-formatter-blocks ()
-  "Test toggling all formatter blocks in buffer mode."
+(ert-deftest obaq-test-replace-all-formatter-blocks ()
+  "Test replacing all formatter blocks in buffer mode."
   (obaq-test-with-temp-buffer "# Test\n\n```js formatter=test\ncode1\n```\n\n```py formatter=black\ncode2\n```\n"
     (let ((obaq-enable-code-block-formatter-p t))
       (cl-letf (((symbol-function 'obaq-mode--format-block)
@@ -347,7 +348,7 @@
                 ((symbol-function 'obaq-mode--fontify-region) #'ignore))
         (should-not obaq-view-mode)
         (should (= 2 (length (obaq-mode--formatter-blocks))))
-        (obaq-mode-toggle-all)
+        (obaq-mode-replace-all)
         (should (= 2 (length (obaq-mode--rendered-regions))))
         (should-not (obaq-mode--formatter-blocks))
         (obaq-mode-restore-all)

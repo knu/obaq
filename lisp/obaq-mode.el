@@ -515,14 +515,21 @@ With prefix argument ALL, refresh all blocks in the buffer."
 
 ;;;###autoload
 (defun obaq-mode-toggle-all ()
-  "Toggle all base blocks in the current buffer."
+  "Toggle all renderable blocks in the current buffer.
+If all blocks are replaced, restore all.  Otherwise, replace all."
   (interactive)
-  (if (obaq-mode--rendered-regions)
-      (obaq-mode-restore-all)
-    (if-let* ((blocks (obaq-mode--all-renderable-blocks)))
-        (dolist (block blocks)
-          (obaq-mode--render-block-auto block))
-      (user-error "No renderable blocks found"))))
+  (if (obaq-mode--all-renderable-blocks)
+      (obaq-mode-replace-all)
+    (obaq-mode-restore-all)))
+
+;;;###autoload
+(defun obaq-mode-replace-all ()
+  "Replace all renderable blocks in the current buffer."
+  (interactive)
+  (if-let* ((blocks (obaq-mode--all-renderable-blocks)))
+      (dolist (block blocks)
+        (obaq-mode--render-block-auto block))
+    (user-error "No renderable blocks found")))
 
 ;;;###autoload
 (defun obaq-mode-refresh-all ()
