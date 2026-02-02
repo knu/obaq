@@ -402,6 +402,43 @@
     (search-forward "query")
     (should-error (obaq-mode-restore-block) :type 'user-error)))
 
+;;; Revert tests
+
+(ert-deftest obaq-test-revert-preserves-replaced-state ()
+  "Test that revert-buffer preserves replaced block state."
+  (obaq-test-with-temp-buffer "# Test\n\n```base\nquery\n```\n# End\n"
+    (cl-letf (((symbol-function 'obaq-mode--render-block)
+               (lambda (block) "Rendered\n"))
+              ((symbol-function 'obaq-mode--fontify-region) #'ignore))
+      (obaq-mode-replace-all)
+      (should (obaq-mode--rendered-regions))
+      (should-not (obaq-mode--base-blocks))
+      ;; Revert should preserve replaced state
+      (revert-buffer t t)
+      (should (obaq-mode--rendered-regions))
+      (should-not (obaq-mode--base-blocks))
+      ;; Should still be able to restore
+      (obaq-mode-restore-all)
+      (should-not (obaq-mode--rendered-regions))
+      (should (obaq-mode--base-blocks)))))
+
+(ert-deftest obaq-test-revert-preserves-partial-replaced-state ()
+  "Test that revert-buffer only re-renders previously replaced blocks."
+  (obaq-test-with-temp-buffer "```base\nfirst\n```\n\n```base\nsecond\n```\n"
+    (cl-letf (((symbol-function 'obaq-mode--render-block)
+               (lambda (block) "Rendered\n"))
+              ((symbol-function 'obaq-mode--fontify-region) #'ignore))
+      ;; Replace only the first block
+      (goto-char (point-min))
+      (search-forward "first")
+      (obaq-mode-toggle-block)
+      (should (= 1 (length (obaq-mode--rendered-regions))))
+      (should (= 1 (length (obaq-mode--base-blocks))))
+      ;; Revert should only re-render the first block
+      (revert-buffer t t)
+      (should (= 1 (length (obaq-mode--rendered-regions))))
+      (should (= 1 (length (obaq-mode--base-blocks)))))))
+
 ;;; View mode tests
 
 (ert-deftest obaq-test-view-quit ()

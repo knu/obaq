@@ -613,13 +613,25 @@ If all blocks are replaced, restore all.  Otherwise, replace all."
 (defun obaq-mode--revert-buffer (&rest args)
   "Revert buffer preserving obaq-buffer-mode state.
 This function is used for `revert-buffer-function' in `obaq-buffer-mode'."
-  (let ((revert-buffer-function obaq-mode--saved-revert-buffer-function)
-        (func (or obaq-mode--saved-revert-buffer-function
-                  #'revert-buffer--default)))
-    (setq obaq-mode--switching-view-mode t)
-    (unwind-protect
-        (apply func args)
-      (setq obaq-mode--switching-view-mode nil))))
+  (let ((rendered-raws (mapcar (lambda (r) (plist-get r :raw))
+                               (obaq-mode--rendered-regions))))
+    ;; Remove obaq overlays before revert
+    (dolist (ov (overlays-in (point-min) (point-max)))
+      (when (or (overlay-get ov 'obaq-rendered)
+                (overlay-get ov 'obaq-rendered-newline))
+        (delete-overlay ov)))
+    (let ((revert-buffer-function obaq-mode--saved-revert-buffer-function)
+          (func (or obaq-mode--saved-revert-buffer-function
+                    #'revert-buffer--default)))
+      (setq obaq-mode--switching-view-mode t)
+      (unwind-protect
+          (apply func args)
+        (setq obaq-mode--switching-view-mode nil)))
+    ;; Re-render only blocks that were rendered before revert
+    (when rendered-raws
+      (dolist (block (reverse (obaq-mode--all-renderable-blocks)))
+        (when (member (plist-get block :raw) rendered-raws)
+          (obaq-mode--render-block-auto block))))))
 
 (defun obaq-view-mode--revert-buffer (&rest args)
   "Revert buffer and re-enter view mode automatically."
