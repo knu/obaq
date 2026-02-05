@@ -82,6 +82,14 @@ export class VaultFile {
     return this.backlinkResolver();
   }
 
+  get basename(): string {
+    if (!this.ext) return this.name;
+    const suffix = `.${this.ext}`;
+    return this.name.endsWith(suffix)
+      ? this.name.slice(0, -suffix.length)
+      : this.name;
+  }
+
   asLink(title?: string): Link {
     return new Link(this.name, title);
   }

@@ -13,6 +13,7 @@ import {
   Duration,
   parseDuration,
   Link,
+  installDateFieldExtensions,
 } from "./functions.js";
 
 let prototypesInitialized = false;
@@ -31,6 +32,7 @@ function setupPrototypeExtensions() {
   Object.assign(Date.prototype, dateExtensions);
   Object.assign(Object.prototype, objectExtensions);
   Object.assign(RegExp.prototype, regexpExtensions);
+  installDateFieldExtensions();
 
   if (!("isTruthy" in Object.prototype)) {
     Object.defineProperty(Object.prototype, "isTruthy", {
@@ -188,10 +190,13 @@ const ALLOWED_METHODS: Record<string, Set<string>> = {
     "isEmpty",
     "join",
     "map",
+    "mean",
+    "median",
     "reduce",
     "reverse",
     "slice",
     "sort",
+    "stddev",
     "unique",
   ]),
   date: new Set(["date", "format", "time", "relative", "isEmpty"]),

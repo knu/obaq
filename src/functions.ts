@@ -2,6 +2,29 @@ import dayjs from "dayjs";
 import { toMarkdown } from "mdast-util-to-markdown";
 import { toMarkdown as wikiLinkToMarkdown } from "mdast-util-wiki-link";
 
+export function installDateFieldExtensions() {
+  const fields: Array<[string, (date: Date) => number]> = [
+    ["year", (date) => dayjs(date).year()],
+    ["month", (date) => dayjs(date).month() + 1],
+    ["day", (date) => dayjs(date).date()],
+    ["hour", (date) => dayjs(date).hour()],
+    ["minute", (date) => dayjs(date).minute()],
+    ["second", (date) => dayjs(date).second()],
+    ["millisecond", (date) => dayjs(date).millisecond()],
+  ];
+
+  for (const [name, getter] of fields) {
+    if (Object.prototype.hasOwnProperty.call(Date.prototype, name)) continue;
+    Object.defineProperty(Date.prototype, name, {
+      get() {
+        return getter(this as Date);
+      },
+      enumerable: true,
+      configurable: true,
+    });
+  }
+}
+
 export class Link {
   private static resolver?: (link: Link) => unknown;
 
@@ -19,6 +42,10 @@ export class Link {
   }
 
   linksTo(file: unknown): boolean {
+    const resolved = this.asFile();
+    if (resolved && typeof (resolved as any).hasLink === "function") {
+      return (resolved as any).hasLink(file);
+    }
     if (file && typeof file === "object") {
       const maybePath = (file as { path?: unknown }).path;
       if (typeof maybePath === "string" && this.path === maybePath) return true;
@@ -143,6 +170,8 @@ export const globalFunctions = {
 
   min: (...values: number[]): number => Math.min(...values),
 
+  random: (): number => Math.random(),
+
   link: (path: string, display?: string): Link => {
     return new Link(path, display);
   },
@@ -182,6 +211,11 @@ export const globalFunctions = {
 // String prototype extensions
 const nativeStartsWith = String.prototype.startsWith;
 const nativeEndsWith = String.prototype.endsWith;
+const nativeReplace = String.prototype.replace as (
+  this: string,
+  pattern: string | RegExp,
+  replacement: string
+) => string;
 
 export const stringExtensions = {
   contains(this: string, value: string): boolean {
@@ -206,6 +240,13 @@ export const stringExtensions = {
 
   lower(this: string): string {
     return this.toLowerCase();
+  },
+
+  replace(this: string, pattern: string | RegExp, replacement: string): string {
+    if (pattern instanceof RegExp) {
+      return nativeReplace.call(this, pattern, replacement);
+    }
+    return this.split(pattern).join(replacement);
   },
 
   reverse(this: string): string {
@@ -247,7 +288,42 @@ export const numberExtensions = {
 };
 
 // Array prototype extensions
+const nativeArraySort = Array.prototype.sort;
 export const arrayExtensions = {
+  mean(this: any[]): number | null {
+    const numbers = this.filter(
+      (value) => typeof value === "number" && Number.isFinite(value)
+    );
+    if (numbers.length === 0) return null;
+    const sum = numbers.reduce((acc, value) => acc + value, 0);
+    return sum / numbers.length;
+  },
+
+  median(this: any[]): number | null {
+    const numbers = this.filter(
+      (value) => typeof value === "number" && Number.isFinite(value)
+    );
+    if (numbers.length === 0) return null;
+    const sorted = [...numbers].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 1) return sorted[mid];
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+  },
+
+  stddev(this: any[]): number | null {
+    const numbers = this.filter(
+      (value) => typeof value === "number" && Number.isFinite(value)
+    );
+    if (numbers.length === 0) return null;
+    if (numbers.length === 1) return 0;
+    const mean =
+      numbers.reduce((acc, value) => acc + value, 0) / numbers.length;
+    const variance =
+      numbers.reduce((acc, value) => acc + (value - mean) ** 2, 0) /
+      numbers.length;
+    return Math.sqrt(variance);
+  },
+
   contains(this: any[], value: any): boolean {
     return this.includes(value);
   },
@@ -270,6 +346,29 @@ export const arrayExtensions = {
 
   unique(this: any[]): any[] {
     return [...new Set(this)];
+  },
+
+  sort(this: any[], compareFn?: (a: any, b: any) => number): any[] {
+    if (typeof compareFn === "function") {
+      nativeArraySort.call(this, compareFn);
+      return this;
+    }
+
+    const compare = (a: any, b: any): number => {
+      if (a == null && b == null) return 0;
+      if (a == null) return 1;
+      if (b == null) return -1;
+
+      const aValue = a instanceof Date ? a.getTime() : a;
+      const bValue = b instanceof Date ? b.getTime() : b;
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return aValue - bValue;
+      }
+      return String(aValue).localeCompare(String(bValue));
+    };
+
+    nativeArraySort.call(this, compare);
+    return this;
   },
 };
 
@@ -344,4 +443,5 @@ export function extendPrototypes() {
   Object.assign(Date.prototype, dateExtensions);
   Object.assign(Object.prototype, objectExtensions);
   Object.assign(RegExp.prototype, regexpExtensions);
+  installDateFieldExtensions();
 }

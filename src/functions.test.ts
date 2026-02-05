@@ -7,7 +7,9 @@ import {
   arrayExtensions,
   dateExtensions,
   Link,
+  installDateFieldExtensions,
 } from "./functions.js";
+import { VaultFile } from "./types.js";
 
 describe("globalFunctions", () => {
   it("date() should parse string dates", () => {
@@ -68,6 +70,13 @@ describe("globalFunctions", () => {
     assert.strictEqual(globalFunctions.number(true), 1);
     assert.strictEqual(globalFunctions.number(false), 0);
   });
+
+  it("random() should return value in [0, 1)", () => {
+    const result = globalFunctions.random();
+    assert.strictEqual(typeof result, "number");
+    assert.ok(result >= 0);
+    assert.ok(result < 1);
+  });
 });
 
 describe("stringExtensions", () => {
@@ -95,6 +104,13 @@ describe("stringExtensions", () => {
 
   it("reverse() should reverse string", () => {
     assert.strictEqual(stringExtensions.reverse.call("hello"), "olleh");
+  });
+
+  it("replace() should replace all occurrences for strings", () => {
+    assert.strictEqual(
+      stringExtensions.replace.call("a:b:c", ":", "-"),
+      "a-b-c"
+    );
   });
 });
 
@@ -132,6 +148,27 @@ describe("arrayExtensions", () => {
     assert.strictEqual(arrayExtensions.contains.call([1, 2, 3], 2), true);
     assert.strictEqual(arrayExtensions.contains.call([1, 2, 3], 5), false);
   });
+
+  it("sort() should sort numbers numerically", () => {
+    const result = arrayExtensions.sort.call([10, 2, 1]);
+    assert.deepStrictEqual(result, [1, 2, 10]);
+  });
+
+  it("mean() should compute average of numbers", () => {
+    const result = arrayExtensions.mean.call([1, 2, 3]);
+    assert.strictEqual(result, 2);
+  });
+
+  it("median() should compute median of numbers", () => {
+    assert.strictEqual(arrayExtensions.median.call([1, 3, 2]), 2);
+    assert.strictEqual(arrayExtensions.median.call([1, 2, 3, 4]), 2.5);
+  });
+
+  it("stddev() should compute population standard deviation", () => {
+    const result = arrayExtensions.stddev.call([1, 2, 3]);
+    assert.ok(result !== null);
+    assert.ok(Math.abs(result - 0.816496580927726) < 1e-12);
+  });
 });
 
 describe("dateExtensions", () => {
@@ -145,5 +182,47 @@ describe("dateExtensions", () => {
   it("time() should return time string", () => {
     const result = dateExtensions.time.call(testDate);
     assert.match(result, /^\d{2}:\d{2}:\d{2}$/);
+  });
+
+  it("date fields should be available on Date objects", () => {
+    installDateFieldExtensions();
+    const d = new Date(2024, 0, 2, 3, 4, 5, 6);
+    assert.strictEqual((d as any).year, 2024);
+    assert.strictEqual((d as any).month, 1);
+    assert.strictEqual((d as any).day, 2);
+    assert.strictEqual((d as any).hour, 3);
+    assert.strictEqual((d as any).minute, 4);
+    assert.strictEqual((d as any).second, 5);
+    assert.strictEqual((d as any).millisecond, 6);
+  });
+});
+
+describe("VaultFile", () => {
+  it("basename should strip extension", () => {
+    const file = new VaultFile({
+      name: "note.md",
+      folder: "",
+      path: "note.md",
+      ext: "md",
+      size: 0,
+      ctime: new Date(),
+      mtime: new Date(),
+      properties: {},
+      tags: [],
+    });
+    assert.strictEqual(file.basename, "note");
+  });
+});
+
+describe("Link", () => {
+  it("linksTo() should use resolved file when available", () => {
+    const resolved = {
+      hasLink: (value: unknown) => value === "target.md",
+    };
+    Link.setResolver(() => resolved);
+    const link = new Link("source.md");
+    assert.strictEqual(link.linksTo("target.md"), true);
+    assert.strictEqual(link.linksTo("other.md"), false);
+    Link.setResolver(undefined);
   });
 });
