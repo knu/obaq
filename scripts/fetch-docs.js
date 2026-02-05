@@ -7,17 +7,20 @@ const ROOT_DIR = dirname(dirname(fileURLToPath(import.meta.url)));
 const DOCS = [
   {
     name: "functions",
-    pageUrl: "https://help.obsidian.md/bases/functions",
+    markdownUrl:
+      "https://raw.githubusercontent.com/obsidianmd/obsidian-help/refs/heads/master/en/Bases/Functions.md",
     outputPath: `${ROOT_DIR}/docs/functions.md`,
   },
   {
     name: "syntax",
-    pageUrl: "https://help.obsidian.md/bases/syntax",
+    markdownUrl:
+      "https://raw.githubusercontent.com/obsidianmd/obsidian-help/refs/heads/master/en/Bases/Bases%20syntax.md",
     outputPath: `${ROOT_DIR}/docs/syntax.md`,
   },
   {
     name: "formulas",
-    pageUrl: "https://help.obsidian.md/formulas",
+    markdownUrl:
+      "https://raw.githubusercontent.com/obsidianmd/obsidian-help/refs/heads/master/en/Bases/Formulas.md",
     outputPath: `${ROOT_DIR}/docs/formulas.md`,
   },
 ];
@@ -30,18 +33,8 @@ async function fetchText(url) {
   return response.text();
 }
 
-function extractPreloadUrl(html, pageUrl) {
-  const match = html.match(/preloadPage=f\("([^"]+)"\)/);
-  if (!match) {
-    throw new Error(`Could not find preloadPage url in ${pageUrl}`);
-  }
-  return match[1];
-}
-
-async function updateDoc({ name, pageUrl, outputPath }) {
-  const html = await fetchText(pageUrl);
-  const preloadUrl = extractPreloadUrl(html, pageUrl);
-  const markdown = await fetchText(preloadUrl);
+async function updateDoc({ name, markdownUrl, outputPath }) {
+  const markdown = await fetchText(markdownUrl);
   const normalized = markdown.replace(/\r\n/g, "\n");
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(
