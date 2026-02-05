@@ -334,7 +334,7 @@ for rendered content."
                (overlay-put nl-ov 'obaq-rendered-newline t)
                (overlay-put nl-ov 'display "")
                (overlay-put nl-ov 'modification-hooks
-                            (list (lambda (ov after-p beg end &optional len)
+                            (list (lambda (_ov after-p _beg _end &optional _len)
                                     (unless after-p
                                       (signal 'text-read-only nil)))))))
            (obaq-mode--refresh-display start end)
