@@ -72,6 +72,9 @@ describe("evaluateExpression", () => {
   it("should evaluate file properties", () => {
     assert.strictEqual(evaluateExpression("file.name", mockFile), "Test");
     assert.strictEqual(evaluateExpression("file.folder", mockFile), "Notes");
+    const nestedFile = evaluateExpression("file.file", mockFile) as VaultFile;
+    assert.ok(nestedFile instanceof VaultFile);
+    assert.strictEqual(nestedFile.path, mockFile.file.path);
   });
 
   it("should evaluate file.asLink", () => {

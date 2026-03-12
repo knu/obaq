@@ -13,6 +13,7 @@ describe("parseVault", () => {
     assert.ok(file.file, "File should have file property");
     assert.ok(file.file.name, "File should have name");
     assert.ok(file.file.path, "File should have path");
+    assert.strictEqual(file.file.file, file.file);
     assert.ok(
       typeof file.file.asLink === "function",
       "File should have asLink function"

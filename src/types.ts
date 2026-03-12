@@ -83,6 +83,10 @@ export class VaultFile {
     return this.backlinkResolver();
   }
 
+  get file(): VaultFile {
+    return this;
+  }
+
   get basename(): string {
     if (!this.ext) return this.name;
     const suffix = `.${this.ext}`;
