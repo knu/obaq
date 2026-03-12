@@ -156,4 +156,46 @@ describe("executeQuery", () => {
     assert.strictEqual(result.columns.length, 1);
     assert.ok(!("formula.formula2" in result.rows[0]));
   });
+
+  it("should resolve formulas that reference other formulas", () => {
+    const query: BaseQuery = {
+      formulas: {
+        total: "formula.doublePriority + 1",
+        doublePriority: "priority * 2",
+      },
+      views: [
+        {
+          type: "table",
+          name: "Test",
+          order: ["formula.total", "formula.doublePriority"],
+        },
+      ],
+    };
+
+    const result = executeQuery(mockFiles, query);
+    assert.strictEqual(result.rows[0]["formula.doublePriority"], 2);
+    assert.strictEqual(result.rows[0]["formula.total"], 3);
+    assert.strictEqual(result.rows[2]["formula.doublePriority"], 6);
+    assert.strictEqual(result.rows[2]["formula.total"], 7);
+  });
+
+  it("should return undefined for circular formula references", () => {
+    const query: BaseQuery = {
+      formulas: {
+        first: "formula.second + 1",
+        second: "formula.first + 1",
+      },
+      views: [
+        {
+          type: "table",
+          name: "Test",
+          order: ["formula.first", "formula.second"],
+        },
+      ],
+    };
+
+    const result = executeQuery(mockFiles, query);
+    assert.strictEqual(result.rows[0]["formula.first"], undefined);
+    assert.strictEqual(result.rows[0]["formula.second"], undefined);
+  });
 });
