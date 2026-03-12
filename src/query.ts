@@ -67,6 +67,10 @@ export function executeQuery(
     });
   }
 
+  const limitedRows =
+    view.limit === undefined
+      ? computedRows
+      : computedRows.slice(0, Math.max(0, view.limit));
   const orderedColumns = view.order || [];
   const columns: Column[] = orderedColumns.map((colId) => {
     const displayName = query.properties?.[colId]?.displayName || colId;
@@ -74,7 +78,7 @@ export function executeQuery(
     return { id: colId, displayName, size };
   });
 
-  const finalRows = computedRows.map((row) => {
+  const finalRows = limitedRows.map((row) => {
     const finalRow: Row = {};
     for (const col of columns) {
       finalRow[col.id] = row[col.id];

@@ -119,6 +119,24 @@ describe("executeQuery", () => {
     assert.strictEqual(result.rows[2]["note.priority"], 1);
   });
 
+  it("should apply view limit after sorting", () => {
+    const query: BaseQuery = {
+      views: [
+        {
+          type: "table",
+          name: "Test",
+          order: ["note.priority"],
+          sort: [{ property: "note.priority", direction: "DESC" }],
+          limit: 2,
+        },
+      ],
+    };
+    const result = executeQuery(mockFiles, query);
+    assert.strictEqual(result.rows.length, 2);
+    assert.strictEqual(result.rows[0]["note.priority"], 3);
+    assert.strictEqual(result.rows[1]["note.priority"], 2);
+  });
+
   it("should apply column properties", () => {
     const query: BaseQuery = {
       properties: {

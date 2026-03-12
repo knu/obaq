@@ -15,6 +15,7 @@ export interface View {
   filters?: Filter;
   order?: string[];
   sort?: SortConfig[];
+  limit?: number;
   columnSize?: Record<string, number>;
 }
 
