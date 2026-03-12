@@ -1,9 +1,9 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative, dirname, basename, extname } from "node:path";
 import matter from "gray-matter";
-import { unified } from "unified";
-import remarkParse from "remark-parse";
-import remarkWikiLink from "remark-wiki-link";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { ofmWikilink } from "@moritzrs/micromark-extension-ofm-wikilink";
+import { ofmWikilinkFromMarkdown } from "@moritzrs/mdast-util-ofm-wikilink";
 import { Link } from "./functions.js";
 import { VaultFile, type ObsidianFile } from "./types.js";
 
@@ -84,23 +84,16 @@ async function scanDirectory(
 
       const extractLinksFromText = (text: string): Link[] => {
         const links: Link[] = [];
-        const tree = unified()
-          .use(remarkParse)
-          .use(remarkWikiLink, {
-            pageResolver: (name: string) => [name],
-            hrefTemplate: (permalink: string) => permalink,
-          })
-          .parse(text);
+        const tree = parseMarkdownTree(text);
 
         const visit = (node: any) => {
-          if (node.type === "wikiLink") {
-            // Extract display text from node data if available
-            const display =
-              node.data?.hProperties?.["data-alias"] ||
-              (node.children?.[0]?.value !== node.value
-                ? node.children?.[0]?.value
-                : undefined);
-            links.push(new Link(node.value, display));
+          if (node.type === "ofmWikilink") {
+            links.push(
+              new Link(
+                buildOfmPath(node),
+                extractOfmAlias(text, node) ?? undefined
+              )
+            );
           }
           if (node.children) {
             node.children.forEach(visit);
@@ -109,6 +102,30 @@ async function scanDirectory(
 
         visit(tree);
         return links;
+      };
+
+      const extractEmbedsFromText = (text: string): Link[] => {
+        const embeds: Link[] = [];
+        const tree = parseMarkdownTree(text);
+        const visit = (node: any) => {
+          if (node.type === "ofmWikiembedding") {
+            embeds.push(
+              new Link(
+                buildOfmPath(node),
+                extractOfmAlias(text, node) ?? undefined
+              )
+            );
+          }
+          if (node.type === "image" && typeof node.url === "string") {
+            embeds.push(new Link(node.url, node.alt || undefined));
+          }
+          if (node.children) {
+            node.children.forEach(visit);
+          }
+        };
+
+        visit(tree);
+        return embeds;
       };
 
       const extractLinks = () => {
@@ -129,6 +146,34 @@ async function scanDirectory(
         return links;
       };
 
+      const extractEmbeds = () => {
+        const embeds: Link[] = [];
+
+        for (const value of Object.values(frontmatter)) {
+          if (typeof value !== "string") continue;
+          if (value.includes("![[")) {
+            embeds.push(...extractEmbedsFromText(value));
+          }
+          if (value.includes("![")) {
+            embeds.push(...extractEmbedsFromText(value));
+          }
+        }
+
+        if (ext === "md" && content) {
+          embeds.push(...extractEmbedsFromText(content));
+        }
+
+        return embeds.filter((embed, index, all) => {
+          return (
+            all.findIndex(
+              (candidate) =>
+                candidate.path === embed.path &&
+                candidate.display === embed.display
+            ) === index
+          );
+        });
+      };
+
       const fileObj = new VaultFile({
         name: fileName,
         folder: folderPath === "." ? "" : folderPath,
@@ -141,6 +186,7 @@ async function scanDirectory(
         tags: fileTags,
       });
       fileObj.setLinkResolver(extractLinks);
+      fileObj.setEmbedResolver(extractEmbeds);
 
       const obsidianFile: ObsidianFile = {
         file: fileObj as ObsidianFile["file"],
@@ -152,4 +198,29 @@ async function scanDirectory(
       files.push(obsidianFile);
     }
   }
+}
+
+function parseMarkdownTree(text: string) {
+  return fromMarkdown(text, {
+    extensions: [ofmWikilink()],
+    mdastExtensions: [ofmWikilinkFromMarkdown()],
+  }) as any;
+}
+
+function buildOfmPath(node: { url?: string; hash?: string }) {
+  if (!node.hash) return String(node.url ?? "");
+  return `${String(node.url ?? "")}#${node.hash}`;
+}
+
+function extractOfmAlias(text: string, node: any): string | null {
+  const start = node.position?.start?.offset;
+  const end = node.position?.end?.offset;
+  if (typeof start !== "number" || typeof end !== "number") return null;
+  const source = text.slice(start, end);
+  const divider = source.indexOf("|");
+  if (divider === -1) return null;
+  const closing = source.lastIndexOf("]]");
+  if (closing === -1 || closing <= divider) return null;
+  const alias = source.slice(divider + 1, closing).trim();
+  return alias || null;
 }

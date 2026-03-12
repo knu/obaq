@@ -43,6 +43,7 @@ export class VaultFile {
   properties: Record<string, unknown>;
   tags: string[];
   private linkResolver: () => Link[] = () => [];
+  private embedResolver: () => Link[] = () => [];
   private backlinkResolver: () => Link[] = () => [];
 
   constructor(options: {
@@ -77,6 +78,14 @@ export class VaultFile {
 
   get links(): Link[] {
     return this.linkResolver();
+  }
+
+  setEmbedResolver(resolver: () => Link[]) {
+    this.embedResolver = resolver;
+  }
+
+  get embeds(): Link[] {
+    return this.embedResolver();
   }
 
   get backlinks(): Link[] {

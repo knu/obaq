@@ -2,6 +2,14 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { parseVault } from "./parser.js";
 import { resolve } from "node:path";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+async function makeParserVault() {
+  const tmpDir = resolve(".tmp");
+  await mkdir(tmpDir, { recursive: true });
+  return mkdtemp(join(tmpDir, "parser-"));
+}
 
 describe("parseVault", () => {
   it("should parse markdown files from test vault", async () => {
@@ -104,6 +112,30 @@ describe("parseVault", () => {
       noteA!.file.backlinks.length,
       0,
       "NoteA should have no backlinks"
+    );
+  });
+
+  it("should parse file embeds", async () => {
+    const vaultDir = await makeParserVault();
+    await mkdir(join(vaultDir, "Notes"));
+    await writeFile(
+      join(vaultDir, "Notes", "Embedded.md"),
+      ["---", "cover: '![[assets/cover.png]]'", "---", "", "![Diagram](assets/diagram.png)", "", "![[assets/inline.png|Inline]]", ""].join("\n")
+    );
+
+    const files = await parseVault(vaultDir);
+    const embedded = files.find((file) => file.file.name === "Embedded");
+
+    assert.ok(embedded, "Should parse Embedded.md");
+    assert.deepStrictEqual(
+      embedded!.file.embeds
+        .map((embed) => embed.toString())
+        .sort(),
+      [
+        "[[assets/cover.png]]",
+        "[[assets/diagram.png|Diagram]]",
+        "[[assets/inline.png|Inline]]",
+      ].sort()
     );
   });
 });
