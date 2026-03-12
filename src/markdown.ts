@@ -12,6 +12,7 @@ interface ReplaceOptions {
   format: OutputFormat;
   baseDir: string;
   thisFile?: ObsidianFile;
+  view?: string;
   titleWidth?: "markup" | "title";
   readStdin?: () => Promise<string>;
   readFile?: (path: string) => Promise<string>;
@@ -37,7 +38,12 @@ export async function replaceBaseCodeBlocks(
         readStdin: options.readStdin,
       });
       const query = load(queryYaml) as BaseQuery;
-      const result = executeQuery(options.files, query, options.thisFile);
+      const result = executeQuery(
+        options.files,
+        query,
+        options.thisFile,
+        options.view
+      );
       const rendered =
         options.format === "md" || options.format === "markdown"
           ? formatResult(result, "markdown", {

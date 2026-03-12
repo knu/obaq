@@ -13,9 +13,10 @@ import { applyFilter } from "./filter.js";
 export function executeQuery(
   files: ObsidianFile[],
   query: BaseQuery,
-  thisContext?: ObsidianFile
+  thisContext?: ObsidianFile,
+  viewName?: string
 ): QueryResult {
-  const view = query.views?.[0];
+  const view = selectView(query, viewName);
   if (!view) {
     return { columns: [], rows: [] };
   }
@@ -87,6 +88,18 @@ export function executeQuery(
   });
 
   return { columns, rows: finalRows };
+}
+
+function selectView(query: BaseQuery, viewName?: string) {
+  if (!viewName) {
+    return query.views?.[0];
+  }
+
+  const view = query.views?.find((candidate) => candidate.name === viewName);
+  if (!view) {
+    throw new Error(`View not found: ${viewName}`);
+  }
+  return view;
 }
 
 function mergeFilters(

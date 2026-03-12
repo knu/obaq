@@ -26,6 +26,8 @@ async function main() {
     "title-width"?: string;
     t?: string;
     this?: string;
+    v?: string;
+    view?: string;
     version?: boolean;
     h?: boolean;
     help?: boolean;
@@ -51,6 +53,8 @@ async function main() {
         "title-width": { type: "string" },
         t: { type: "string" },
         this: { type: "string" },
+        v: { type: "string" },
+        view: { type: "string" },
         version: { type: "boolean" },
         h: { type: "boolean" },
         help: { type: "boolean" },
@@ -80,6 +84,7 @@ async function main() {
   const formatOverride = values.f || values.format;
   const titleWidth = values["title-width"] ?? "markup";
   const thisPath = values.t || values.this;
+  const viewName = values.v || values.view;
 
   if (!queryYaml && !markdownPath) {
     printHelp(version);
@@ -149,7 +154,7 @@ async function main() {
       }
 
       const query = load(resolvedQuery) as BaseQuery;
-      const result = executeQuery(files, query, thisFile);
+      const result = executeQuery(files, query, thisFile, viewName);
       console.log(
         formatResult(result, format, { titleWidth: titleWidth as any })
       );
@@ -160,6 +165,7 @@ async function main() {
         baseDir: markdownDir,
         thisFile,
         titleWidth: titleWidth as any,
+        view: viewName,
         readStdin: markdownPath === "-" ? undefined : readStdin,
       });
       console.log(output);
@@ -218,6 +224,7 @@ Options:
   -f, --format FORMAT         Output format: ${formats}
       --title-width MODE      Table width: markup|title (default: markup)
   -t, --this PATH             Use PATH as the "this" file context
+  -v, --view NAME             Use the named view from the base
       --version               Show version
   -h, --help                  Show this help
 

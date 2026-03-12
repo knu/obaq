@@ -146,6 +146,32 @@ describe("replaceBaseCodeBlocks", () => {
     assert.ok(!output.includes("Third Note"));
   });
 
+  it("uses the selected view when replacing base blocks", async () => {
+    const markdown = [
+      "```base",
+      "views:",
+      "  - type: table",
+      "    name: First",
+      "    order:",
+      "      - note.title",
+      "  - type: table",
+      "    name: Second",
+      "    order:",
+      "      - note.missing",
+      "```",
+    ].join("\n");
+
+    const output = await replaceBaseCodeBlocks(markdown, {
+      files: mockFiles,
+      format: "markdown",
+      baseDir: "/repo",
+      view: "Second",
+    });
+
+    assert.ok(output.includes("| note.missing |"));
+    assert.ok(!output.includes("| note.title |"));
+  });
+
   it("preserves frontmatter and wiki links", async () => {
     const markdown = [
       "---",

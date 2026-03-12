@@ -70,6 +70,43 @@ describe("executeQuery", () => {
     assert.strictEqual(result.rows.length, 0);
   });
 
+  it("should use the named view when selected", () => {
+    const query: BaseQuery = {
+      views: [
+        {
+          type: "table",
+          name: "First",
+          order: ["note.title"],
+        },
+        {
+          type: "table",
+          name: "Second",
+          order: ["note.priority"],
+        },
+      ],
+    };
+
+    const result = executeQuery(mockFiles, query, undefined, "Second");
+    assert.strictEqual(result.columns[0].id, "note.priority");
+    assert.strictEqual(result.rows[0]["note.priority"], 1);
+  });
+
+  it("should fail when the named view does not exist", () => {
+    const query: BaseQuery = {
+      views: [
+        {
+          type: "table",
+          name: "First",
+          order: ["note.title"],
+        },
+      ],
+    };
+
+    assert.throws(() => executeQuery(mockFiles, query, undefined, "Missing"), {
+      message: "View not found: Missing",
+    });
+  });
+
   it("should filter files", () => {
     const query: BaseQuery = {
       views: [
