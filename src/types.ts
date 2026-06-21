@@ -113,7 +113,13 @@ export class VaultFile {
   }
 
   hasTag(...tags: string[]): boolean {
-    return tags.some((tag) => this.tags.includes(tag));
+    return tags.some((tag) => {
+      const normalized = tag.replace(/^#+/, "");
+      return this.tags.some(
+        (fileTag) =>
+          fileTag === normalized || fileTag.startsWith(`${normalized}/`)
+      );
+    });
   }
 
   hasLink(...linkNames: (string | { name: string })[]): boolean {

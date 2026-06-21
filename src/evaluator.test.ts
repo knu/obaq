@@ -16,7 +16,7 @@ const mockFile: ObsidianFile = {
     ctime: new Date("2024-01-15T10:30:00+00:00"),
     mtime: new Date("2024-01-20T14:45:00+00:00"),
     properties: {},
-    tags: ["tag1", "tag2"],
+    tags: ["tag1", "tag2", "nested/tag"],
   }),
   content: "Test content",
   note: {
@@ -208,6 +208,18 @@ describe("evaluateExpression", () => {
     assert.strictEqual(
       evaluateExpression('file.hasTag("tag1")', mockFile),
       true
+    );
+    assert.strictEqual(
+      evaluateExpression('file.hasTag("nested")', mockFile),
+      true
+    );
+    assert.strictEqual(
+      evaluateExpression('file.hasTag("#nested")', mockFile),
+      true
+    );
+    assert.strictEqual(
+      evaluateExpression('file.hasTag("missing")', mockFile),
+      false
     );
     assert.strictEqual(
       evaluateExpression('file.inFolder("Notes")', mockFile),
