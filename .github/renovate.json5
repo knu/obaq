@@ -2,36 +2,42 @@
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: [
     "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":dependencyDashboard",
+    ":semanticCommitsDisabled",
   ],
-  schedule: [
-    "before 6am on Monday",
-  ],
-  dependencyDashboard: true,
-  labels: ["dependencies", "automerge"],
-  packageRules: [
-    {
-      matchManagers: ["npm"],
-      matchUpdateTypes: ["minor", "patch"],
-      groupName: "npm dependencies (non-major)",
-    },
-    {
-      matchManagers: ["npm"],
-      matchDepTypes: ["devDependencies"],
-      matchUpdateTypes: ["major"],
-      groupName: "npm dev dependencies (major)",
-    },
-    {
-      matchManagers: ["npm"],
-      matchDepTypes: ["dependencies"],
-      matchUpdateTypes: ["major"],
-      enabled: true,
-    },
-  ],
-  vulnerabilityAlerts: {
-    enabled: true,
-    labels: ["security"],
-  },
+  labels: ["dependencies"],
+  timezone: "Asia/Tokyo",
+  schedule: ["after 9am on friday", "before 6pm on friday"],
   npm: {
     minimumReleaseAge: "3 days",
   },
+  lockFileMaintenance: {
+    enabled: true,
+    labels: ["dependencies"],
+    schedule: ["after 9am on friday", "before 6pm on friday"],
+  },
+  vulnerabilityAlerts: {
+    enabled: true,
+    labels: ["dependencies", "security"],
+  },
+  packageRules: [
+    {
+      matchUpdateTypes: ["major"],
+      addLabels: ["dependencies:major"],
+    },
+    {
+      matchManagers: ["github-actions"],
+      groupName: "github actions",
+      labels: ["dependencies"],
+      minimumReleaseAge: "7 days",
+    },
+    {
+      matchDepTypes: ["devDependencies"],
+      groupName: "development dependencies",
+      labels: ["dependencies", "automerge"],
+      automerge: true,
+      minimumReleaseAge: "3 days",
+    },
+  ],
 }
