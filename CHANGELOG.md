@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0
+- Improve compatibility with current Obsidian Bases syntax.
+- Support formula-to-formula references.
+- Support selecting named views and view row limits.
+- Support view `groupBy` metadata and view summaries.
+- Add `file.file` and `file.embeds`.
+- Parse Obsidian Flavored Markdown wikilinks and embeds with OFM parser extensions.
+- Include inline tags in `file.tags` and support nested tags in `file.hasTag()`.
+- Compare Link and File values by target in equality checks and list `contains()`.
+- Return Link objects from `file.asLink()`.
+- Publish npm releases with GitHub trusted publishing.
+
 ## 1.1.0
 - Improve Bases function coverage and compatibility.
 - Add undocumented list functions noted in the changelog: `mean()`, `median()`, `stddev()`.
