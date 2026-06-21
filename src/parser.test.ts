@@ -120,7 +120,16 @@ describe("parseVault", () => {
     await mkdir(join(vaultDir, "Notes"));
     await writeFile(
       join(vaultDir, "Notes", "Embedded.md"),
-      ["---", "cover: '![[assets/cover.png]]'", "---", "", "![Diagram](assets/diagram.png)", "", "![[assets/inline.png|Inline]]", ""].join("\n")
+      [
+        "---",
+        "cover: '![[assets/cover.png]]'",
+        "---",
+        "",
+        "![Diagram](assets/diagram.png)",
+        "",
+        "![[assets/inline.png|Inline]]",
+        "",
+      ].join("\n")
     );
 
     const files = await parseVault(vaultDir);
@@ -128,14 +137,49 @@ describe("parseVault", () => {
 
     assert.ok(embedded, "Should parse Embedded.md");
     assert.deepStrictEqual(
-      embedded!.file.embeds
-        .map((embed) => embed.toString())
-        .sort(),
+      embedded!.file.embeds.map((embed) => embed.toString()).sort(),
       [
         "[[assets/cover.png]]",
         "[[assets/diagram.png|Diagram]]",
         "[[assets/inline.png|Inline]]",
       ].sort()
     );
+  });
+
+  it("should include frontmatter and inline tags in file.tags", async () => {
+    const vaultDir = await makeParserVault();
+    await mkdir(join(vaultDir, "Notes"));
+    await writeFile(
+      join(vaultDir, "Notes", "Tagged.md"),
+      [
+        "---",
+        "tags:",
+        "  - frontmatter",
+        "  - '#MixedCase'",
+        "---",
+        "",
+        "Body has #inline and #project/alpha tags.",
+        "",
+        "`#ignored-inline-code`",
+        "",
+        "```md",
+        "#ignored-code-block",
+        "```",
+        "",
+        "Repeated #INLINE should be deduplicated.",
+        "",
+      ].join("\n")
+    );
+
+    const files = await parseVault(vaultDir);
+    const tagged = files.find((file) => file.file.name === "Tagged");
+
+    assert.ok(tagged, "Should parse Tagged.md");
+    assert.deepStrictEqual(tagged!.file.tags, [
+      "frontmatter",
+      "MixedCase",
+      "inline",
+      "project/alpha",
+    ]);
   });
 });

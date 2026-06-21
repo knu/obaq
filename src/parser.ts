@@ -7,6 +7,9 @@ import { ofmWikilinkFromMarkdown } from "@moritzrs/mdast-util-ofm-wikilink";
 import { Link } from "./functions.js";
 import { VaultFile, type ObsidianFile } from "./types.js";
 
+const tagPattern =
+  /(^|[^\p{L}\p{N}_/])#((?=[\p{L}\p{N}_/-]*[\p{L}_/-])[\p{L}\p{N}_-]+(?:\/[\p{L}\p{N}_-]+)*)/gu;
+
 export async function parseVault(vaultPath: string): Promise<ObsidianFile[]> {
   const files: ObsidianFile[] = [];
   await scanDirectory(vaultPath, vaultPath, files);
@@ -76,11 +79,10 @@ async function scanDirectory(
         frontmatter.title = titleDefault;
       }
 
-      const fileTags = (() => {
-        const tags = frontmatter.tags;
-        if (!tags) return [];
-        return Array.isArray(tags) ? tags : [tags];
-      })();
+      const fileTags = extractFileTags(
+        frontmatter,
+        ext === "md" ? content : ""
+      );
 
       const extractLinksFromText = (text: string): Link[] => {
         const links: Link[] = [];
@@ -131,7 +133,6 @@ async function scanDirectory(
       const extractLinks = () => {
         const links: Link[] = [];
 
-        // Extract links from frontmatter using remark
         for (const value of Object.values(frontmatter)) {
           if (typeof value === "string" && value.includes("[[")) {
             links.push(...extractLinksFromText(value));
@@ -223,4 +224,76 @@ function extractOfmAlias(text: string, node: any): string | null {
   if (closing === -1 || closing <= divider) return null;
   const alias = source.slice(divider + 1, closing).trim();
   return alias || null;
+}
+
+function extractFileTags(
+  frontmatter: Record<string, unknown>,
+  content: string
+): string[] {
+  const tags: string[] = [];
+
+  for (const value of normalizeFrontmatterTags(frontmatter.tags)) {
+    tags.push(value);
+  }
+
+  for (const value of extractInlineTags(content)) {
+    tags.push(value);
+  }
+
+  return dedupeTags(tags);
+}
+
+function normalizeFrontmatterTags(value: unknown): string[] {
+  if (typeof value === "string") {
+    const normalized = normalizeTag(value);
+    return normalized ? [normalized] : [];
+  }
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((item) => normalizeFrontmatterTags(item));
+}
+
+function extractInlineTags(markdown: string): string[] {
+  if (!markdown) return [];
+
+  const tags: string[] = [];
+  const tree = parseMarkdownTree(markdown);
+  const visit = (node: any) => {
+    if (node.type === "code" || node.type === "inlineCode") {
+      return;
+    }
+    if (node.type === "text" && typeof node.value === "string") {
+      for (const match of node.value.matchAll(tagPattern)) {
+        const normalized = normalizeTag(match[2]);
+        if (normalized) {
+          tags.push(normalized);
+        }
+      }
+    }
+    if (node.children) {
+      node.children.forEach(visit);
+    }
+  };
+
+  visit(tree);
+  return tags;
+}
+
+function normalizeTag(tag: string): string | null {
+  const normalized = tag.trim().replace(/^#+/, "");
+  return normalized ? normalized : null;
+}
+
+function dedupeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+
+  for (const tag of tags) {
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(tag);
+  }
+
+  return deduped;
 }
