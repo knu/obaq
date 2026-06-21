@@ -2,6 +2,7 @@ export interface BaseQuery {
   filters?: Filter;
   formulas?: Record<string, string>;
   properties?: Record<string, PropertyConfig>;
+  summaries?: Record<string, string>;
   views?: View[];
 }
 
@@ -17,6 +18,7 @@ export interface View {
   sort?: SortConfig[];
   limit?: number;
   groupBy?: GroupByConfig;
+  summaries?: Record<string, string>;
   columnSize?: Record<string, number>;
 }
 
@@ -150,6 +152,7 @@ export interface QueryResult {
   rows: Row[];
   groupBy?: GroupByConfig;
   groups?: QueryGroup[];
+  summaries?: Record<string, unknown>;
 }
 
 export interface Column {

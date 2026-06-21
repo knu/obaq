@@ -105,6 +105,14 @@ export function executeQuery(
       view.groupBy.property
     );
   }
+  if (view.summaries) {
+    result.summaries = computeSummaries(
+      view.summaries,
+      query.summaries,
+      limitedRows,
+      files
+    );
+  }
 
   return result;
 }
@@ -206,6 +214,138 @@ function compareValues(a: unknown, b: unknown): number {
   return 0;
 }
 
+function computeSummaries(
+  viewSummaries: Record<string, string>,
+  customSummaries: Record<string, string> | undefined,
+  rows: Row[],
+  files: ObsidianFile[]
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(viewSummaries).map(([property, summaryName]) => {
+      const values = rows.map((row) => getRowValue(row, property));
+      return [
+        property,
+        evaluateSummary(summaryName, values, customSummaries, rows, files),
+      ];
+    })
+  );
+}
+
+function evaluateSummary(
+  summaryName: string,
+  values: unknown[],
+  customSummaries: Record<string, string> | undefined,
+  rows: Row[],
+  files: ObsidianFile[]
+): unknown {
+  const customExpression = customSummaries?.[summaryName];
+  if (customExpression !== undefined) {
+    const firstFile = getFirstSummaryFile(rows, files);
+    if (!firstFile) return undefined;
+    return evaluateExpression(
+      customExpression,
+      {
+        ...firstFile,
+        values,
+      },
+      firstFile,
+      files
+    );
+  }
+
+  return evaluateDefaultSummary(summaryName, values);
+}
+
+function getFirstSummaryFile(
+  rows: Row[],
+  files: ObsidianFile[]
+): ObsidianFile | undefined {
+  return (rows[0]?._file as ObsidianFile | undefined) ?? files[0];
+}
+
+function evaluateDefaultSummary(name: string, values: unknown[]): unknown {
+  const numbers = values.filter(isFiniteNumber);
+  const dates = values.filter((value): value is Date => value instanceof Date);
+
+  switch (name) {
+    case "Average":
+      return numbers.length === 0 ? null : sum(numbers) / numbers.length;
+    case "Min":
+      return numbers.length === 0 ? null : Math.min(...numbers);
+    case "Max":
+      return numbers.length === 0 ? null : Math.max(...numbers);
+    case "Sum":
+      return sum(numbers);
+    case "Range":
+      if (numbers.length > 0)
+        return Math.max(...numbers) - Math.min(...numbers);
+      if (dates.length > 0) {
+        return Math.max(...dates.map(Number)) - Math.min(...dates.map(Number));
+      }
+      return null;
+    case "Median":
+      return median(numbers);
+    case "Stddev":
+      return stddev(numbers);
+    case "Earliest":
+      return dates.length === 0
+        ? null
+        : new Date(Math.min(...dates.map(Number)));
+    case "Latest":
+      return dates.length === 0
+        ? null
+        : new Date(Math.max(...dates.map(Number)));
+    case "Checked":
+      return values.filter((value) => value === true).length;
+    case "Unchecked":
+      return values.filter((value) => value === false).length;
+    case "Empty":
+      return values.filter(isEmptyValue).length;
+    case "Filled":
+      return values.filter((value) => !isEmptyValue(value)).length;
+    case "Unique":
+      return new Set(values.map(groupKey)).size;
+    default:
+      return undefined;
+  }
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[mid];
+  return (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function stddev(values: number[]): number | null {
+  if (values.length === 0) return null;
+  if (values.length === 1) return 0;
+  const mean = sum(values) / values.length;
+  const variance =
+    values.reduce((total, value) => total + (value - mean) ** 2, 0) /
+    values.length;
+  return Math.sqrt(variance);
+}
+
+function isEmptyValue(value: unknown): boolean {
+  if (value === null || value === undefined || value === "") return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (value instanceof Date) return false;
+  if (value && typeof value === "object") {
+    return Object.keys(value).length === 0;
+  }
+  return false;
+}
+
 function computeFormulaValues(
   file: ObsidianFile,
   formulas: Record<string, string> | undefined,
@@ -230,10 +370,7 @@ function computeFormulaValues(
       return Object.keys(definedFormulas);
     },
     getOwnPropertyDescriptor(_target, property) {
-      if (
-        typeof property !== "string" ||
-        !(property in definedFormulas)
-      ) {
+      if (typeof property !== "string" || !(property in definedFormulas)) {
         return undefined;
       }
       return {
@@ -278,7 +415,9 @@ function computeFormulaValues(
   }
 }
 
-function collectCircularFormulas(formulas: Record<string, string>): Set<string> {
+function collectCircularFormulas(
+  formulas: Record<string, string>
+): Set<string> {
   const dependencies = new Map<string, string[]>();
   for (const [key, expr] of Object.entries(formulas)) {
     dependencies.set(

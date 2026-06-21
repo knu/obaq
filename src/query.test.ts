@@ -202,6 +202,36 @@ describe("executeQuery", () => {
     assert.strictEqual(result.groupBy?.property, "file.folder");
   });
 
+  it("should compute view summaries", () => {
+    const query: BaseQuery = {
+      formulas: {
+        doublePriority: "priority * 2",
+      },
+      summaries: {
+        roundedAverage: "values.mean().round(1)",
+      },
+      views: [
+        {
+          type: "table",
+          name: "Test",
+          order: ["note.title", "note.priority", "formula.doublePriority"],
+          summaries: {
+            "note.priority": "Average",
+            "formula.doublePriority": "roundedAverage",
+            "note.title": "Unique",
+          },
+        },
+      ],
+    };
+
+    const result = executeQuery(mockFiles, query);
+    assert.deepStrictEqual(result.summaries, {
+      "note.priority": 2,
+      "formula.doublePriority": 4,
+      "note.title": 3,
+    });
+  });
+
   it("should apply column properties", () => {
     const query: BaseQuery = {
       properties: {
