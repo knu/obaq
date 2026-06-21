@@ -140,9 +140,9 @@ describe("replaceBaseCodeBlocks", () => {
       thisFile,
     });
 
-    assert.ok(output.includes("[First Note](Note1.md)"));
-    assert.ok(output.includes("[ChatGPT/Note2.md](Note2.md)"));
-    assert.ok(!output.includes("[ChatGPT Report](ChatGPT.md)"));
+    assert.ok(output.includes("[[Note1|First Note]]"));
+    assert.ok(output.includes("[[Note2|ChatGPT/Note2.md]]"));
+    assert.ok(!output.includes("[[ChatGPT|ChatGPT Report]]"));
     assert.ok(!output.includes("Third Note"));
   });
 

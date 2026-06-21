@@ -99,8 +99,8 @@ describe("integration", () => {
     );
     assert.ok(row, "Should find row with First Note");
     assert.ok(
-      row!["formula.titleLink"]?.toString().includes("]("),
-      "Should have markdown link format"
+      row!["formula.titleLink"]?.toString().startsWith("[["),
+      "Should have wiki link format"
     );
     assert.match(
       row!["formula.dateFormatted"] as string,

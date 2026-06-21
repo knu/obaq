@@ -1,4 +1,3 @@
-import { posix } from "node:path";
 import * as acorn from "acorn";
 import dayjs from "dayjs";
 import { VaultFile, type ObsidianFile } from "./types.js";
@@ -113,7 +112,7 @@ function createEvalContext(
 ): ObsidianFile {
   const fileProxy = Object.create(context.file);
   Object.defineProperty(fileProxy, "asLink", {
-    value: (_title?: string) => buildFileLink(context, thisContext),
+    value: (title?: string) => context.file.asLink(title),
     enumerable: true,
   });
 
@@ -121,27 +120,6 @@ function createEvalContext(
     ...context,
     file: fileProxy,
   };
-}
-
-function buildFileLink(
-  target: ObsidianFile,
-  thisContext?: ObsidianFile
-): string {
-  const linkText =
-    typeof target.title === "string" && target.title.trim() !== ""
-      ? target.title
-      : target.file.path;
-  if (!thisContext) {
-    return `[${linkText}](${target.file.path})`;
-  }
-
-  const fromDir = posix.dirname(thisContext.file.path);
-  let linkPath = posix.relative(fromDir, target.file.path);
-  if (!linkPath) {
-    linkPath = posix.basename(target.file.path);
-  }
-
-  return `[${linkText}](${linkPath})`;
 }
 
 function createGlobalFunctions(vaultFiles?: ObsidianFile[]) {
