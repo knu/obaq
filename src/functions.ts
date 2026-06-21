@@ -81,13 +81,66 @@ export class Link {
     if (other instanceof Link) {
       return this.path === other.path;
     }
-    if (other && typeof other === "object") {
-      const maybePath = (other as { path?: unknown }).path;
-      if (typeof maybePath === "string" && this.path === maybePath) return true;
+    const file = getFileIdentity(other);
+    if (file) {
+      if (file.path !== undefined && this.path === file.path) return true;
+      if (file.name !== undefined && this.path === file.name) return true;
     }
-    // Compare with file object
-    return this.path === other.name;
+    return false;
   }
+}
+
+export function valuesEqual(
+  left: unknown,
+  right: unknown,
+  options: { coerce?: boolean } = {}
+): boolean {
+  if (linksOrFilesEqual(left, right)) return true;
+  return options.coerce ? (left as any) == (right as any) : left === right;
+}
+
+function linksOrFilesEqual(left: unknown, right: unknown): boolean {
+  if (left instanceof Link) return left.equals(right as any);
+  if (right instanceof Link) return right.equals(left as any);
+
+  const leftFile = getFileIdentity(left);
+  const rightFile = getFileIdentity(right);
+  if (!leftFile || !rightFile) return false;
+
+  if (
+    leftFile.path !== undefined &&
+    rightFile.path !== undefined &&
+    leftFile.path === rightFile.path
+  ) {
+    return true;
+  }
+  return (
+    leftFile.name !== undefined &&
+    rightFile.name !== undefined &&
+    leftFile.name === rightFile.name
+  );
+}
+
+function getFileIdentity(
+  value: unknown
+): { path?: string; name?: string } | undefined {
+  if (!value || typeof value !== "object") return undefined;
+
+  const path = (value as { path?: unknown }).path;
+  const name = (value as { name?: unknown }).name;
+  if (typeof path === "string" || typeof name === "string") {
+    return {
+      path: typeof path === "string" ? path : undefined,
+      name: typeof name === "string" ? name : undefined,
+    };
+  }
+
+  const file = (value as { file?: unknown }).file;
+  if (file && typeof file === "object" && file !== value) {
+    return getFileIdentity(file);
+  }
+
+  return undefined;
 }
 
 export type DurationUnit =
@@ -325,15 +378,19 @@ export const arrayExtensions = {
   },
 
   contains(this: any[], value: any): boolean {
-    return this.includes(value);
+    return this.some((item) => valuesEqual(item, value));
   },
 
   containsAll(this: any[], ...values: any[]): boolean {
-    return values.every((v) => this.includes(v));
+    return values.every((value) =>
+      this.some((item) => valuesEqual(item, value))
+    );
   },
 
   containsAny(this: any[], ...values: any[]): boolean {
-    return values.some((v) => this.includes(v));
+    return values.some((value) =>
+      this.some((item) => valuesEqual(item, value))
+    );
   },
 
   isEmpty(this: any[]): boolean {

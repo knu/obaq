@@ -14,6 +14,7 @@ import {
   parseDuration,
   Link,
   installDateFieldExtensions,
+  valuesEqual,
 } from "./functions.js";
 
 let prototypesInitialized = false;
@@ -519,9 +520,9 @@ function evaluateBinary(
     case "%":
       return (left as any) % (right as any);
     case "==":
-      return (left as any) == (right as any);
+      return valuesEqual(left, right, { coerce: true });
     case "!=":
-      return (left as any) != (right as any);
+      return !valuesEqual(left, right, { coerce: true });
     case "===":
       return (left as any) === (right as any);
     case "!==":

@@ -149,6 +149,29 @@ describe("arrayExtensions", () => {
     assert.strictEqual(arrayExtensions.contains.call([1, 2, 3], 5), false);
   });
 
+  it("contains() should compare links and files by target", () => {
+    const file = new VaultFile({
+      name: "Target",
+      folder: "Notes",
+      path: "Notes/Target.md",
+      ext: "md",
+      size: 0,
+      ctime: new Date("2024-01-01T00:00:00+00:00"),
+      mtime: new Date("2024-01-01T00:00:00+00:00"),
+      properties: {},
+      tags: [],
+    });
+
+    assert.strictEqual(
+      arrayExtensions.contains.call([new Link("Notes/Target.md")], file),
+      true
+    );
+    assert.strictEqual(
+      arrayExtensions.contains.call([new Link("Target")], { file }),
+      true
+    );
+  });
+
   it("sort() should sort numbers numerically", () => {
     const result = arrayExtensions.sort.call([10, 2, 1]);
     assert.deepStrictEqual(result, [1, 2, 10]);

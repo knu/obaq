@@ -59,6 +59,8 @@ const mockFile: ObsidianFile = {
   urgency: 3,
   effort: 2,
   monthlyUses: 4,
+  author: new Link("Test"),
+  authors: [new Link("Test")],
   formula: {
     price_per_unit: 6.25,
     Owned: 2.4,
@@ -198,6 +200,19 @@ describe("evaluateExpression", () => {
     ) as Link;
     assert.ok(result instanceof Link);
     assert.strictEqual(result.toString(), "[[path|display]]");
+  });
+
+  it("should compare links and files by target", () => {
+    assert.strictEqual(evaluateExpression("author == this", mockFile), true);
+    assert.strictEqual(
+      evaluateExpression("authors.contains(this)", mockFile),
+      true
+    );
+    assert.strictEqual(
+      evaluateExpression("authors.contains(file)", mockFile),
+      true
+    );
+    assert.strictEqual(evaluateExpression("author != this", mockFile), false);
   });
 
   it("should support file methods", () => {
