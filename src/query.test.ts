@@ -174,6 +174,34 @@ describe("executeQuery", () => {
     assert.strictEqual(result.rows[1]["note.priority"], 2);
   });
 
+  it("should group rows by the selected property", () => {
+    const query: BaseQuery = {
+      views: [
+        {
+          type: "table",
+          name: "Test",
+          order: ["note.title"],
+          groupBy: { property: "file.folder", direction: "DESC" },
+        },
+      ],
+    };
+
+    const result = executeQuery(mockFiles, query);
+    assert.deepStrictEqual(
+      result.rows.map((row) => row["note.title"]),
+      ["First Note", "Second Note", "Third Note"]
+    );
+    assert.deepStrictEqual(
+      result.groups?.map((group) => group.value),
+      ["Notes", "Archive"]
+    );
+    assert.deepStrictEqual(
+      result.groups?.map((group) => group.rows.length),
+      [2, 1]
+    );
+    assert.strictEqual(result.groupBy?.property, "file.folder");
+  });
+
   it("should apply column properties", () => {
     const query: BaseQuery = {
       properties: {

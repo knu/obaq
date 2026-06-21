@@ -16,6 +16,7 @@ export interface View {
   order?: string[];
   sort?: SortConfig[];
   limit?: number;
+  groupBy?: GroupByConfig;
   columnSize?: Record<string, number>;
 }
 
@@ -26,6 +27,11 @@ export type Filter =
   | { not: Filter[] };
 
 export interface SortConfig {
+  property: string;
+  direction: "ASC" | "DESC";
+}
+
+export interface GroupByConfig {
   property: string;
   direction: "ASC" | "DESC";
 }
@@ -142,6 +148,8 @@ export interface ObsidianFile {
 export interface QueryResult {
   columns: Column[];
   rows: Row[];
+  groupBy?: GroupByConfig;
+  groups?: QueryGroup[];
 }
 
 export interface Column {
@@ -152,4 +160,9 @@ export interface Column {
 
 export interface Row {
   [key: string]: unknown;
+}
+
+export interface QueryGroup {
+  value: unknown;
+  rows: Row[];
 }

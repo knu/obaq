@@ -6,6 +6,7 @@ import type {
   Column,
   Row,
   Filter,
+  QueryGroup,
 } from "./types.js";
 import { evaluateExpression } from "./evaluator.js";
 import { applyFilter } from "./filter.js";
@@ -53,8 +54,8 @@ export function executeQuery(
   if (view.sort) {
     computedRows.sort((a, b) => {
       for (const sortConfig of view.sort!) {
-        const aVal = a[sortConfig.property] as any;
-        const bVal = b[sortConfig.property] as any;
+        const aVal = getRowValue(a, sortConfig.property) as any;
+        const bVal = getRowValue(b, sortConfig.property) as any;
 
         let cmp = 0;
         if (aVal < bVal) cmp = -1;
@@ -68,10 +69,18 @@ export function executeQuery(
     });
   }
 
+  const groupedRows = view.groupBy
+    ? orderRowsByGroup(
+        computedRows,
+        view.groupBy.property,
+        view.groupBy.direction
+      )
+    : computedRows;
+
   const limitedRows =
     view.limit === undefined
-      ? computedRows
-      : computedRows.slice(0, Math.max(0, view.limit));
+      ? groupedRows
+      : groupedRows.slice(0, Math.max(0, view.limit));
   const orderedColumns = view.order || [];
   const columns: Column[] = orderedColumns.map((colId) => {
     const displayName = query.properties?.[colId]?.displayName || colId;
@@ -82,12 +91,22 @@ export function executeQuery(
   const finalRows = limitedRows.map((row) => {
     const finalRow: Row = {};
     for (const col of columns) {
-      finalRow[col.id] = row[col.id];
+      finalRow[col.id] = getRowValue(row, col.id);
     }
     return finalRow;
   });
 
-  return { columns, rows: finalRows };
+  const result: QueryResult = { columns, rows: finalRows };
+  if (view.groupBy) {
+    result.groupBy = view.groupBy;
+    result.groups = groupFinalRows(
+      limitedRows,
+      finalRows,
+      view.groupBy.property
+    );
+  }
+
+  return result;
 }
 
 function selectView(query: BaseQuery, viewName?: string) {
@@ -109,6 +128,82 @@ function mergeFilters(
   if (!baseFilter) return viewFilter;
   if (!viewFilter) return baseFilter;
   return { and: [baseFilter, viewFilter] };
+}
+
+function orderRowsByGroup(
+  rows: Row[],
+  property: string,
+  direction: "ASC" | "DESC"
+): Row[] {
+  return groupRows(rows, property)
+    .sort((a, b) => {
+      const cmp = compareValues(a.value, b.value);
+      return direction === "DESC" ? -cmp : cmp;
+    })
+    .flatMap((group) => group.rows);
+}
+
+function groupRows(rows: Row[], property: string): QueryGroup[] {
+  const groups = new Map<string, QueryGroup>();
+
+  for (const row of rows) {
+    const value = getRowValue(row, property);
+    const key = groupKey(value);
+    const group = groups.get(key);
+    if (group) {
+      group.rows.push(row);
+    } else {
+      groups.set(key, { value, rows: [row] });
+    }
+  }
+
+  return [...groups.values()];
+}
+
+function groupFinalRows(
+  sourceRows: Row[],
+  finalRows: Row[],
+  property: string
+): QueryGroup[] {
+  const groups = new Map<string, QueryGroup>();
+
+  for (const [index, sourceRow] of sourceRows.entries()) {
+    const value = getRowValue(sourceRow, property);
+    const key = groupKey(value);
+    const group = groups.get(key);
+    if (group) {
+      group.rows.push(finalRows[index]);
+    } else {
+      groups.set(key, { value, rows: [finalRows[index]] });
+    }
+  }
+
+  return [...groups.values()];
+}
+
+function getRowValue(row: Row, property: string): unknown {
+  if (property in row) return row[property];
+
+  if (property.startsWith("file.")) {
+    const file = (row._file as ObsidianFile | undefined)?.file;
+    const key = property.slice("file.".length);
+    return file ? (file as any)[key] : undefined;
+  }
+
+  return undefined;
+}
+
+function groupKey(value: unknown): string {
+  return JSON.stringify(value) ?? String(value);
+}
+
+function compareValues(a: unknown, b: unknown): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if ((a as any) < (b as any)) return -1;
+  if ((a as any) > (b as any)) return 1;
+  return 0;
 }
 
 function computeFormulaValues(
