@@ -46,7 +46,7 @@
     "csv-stringify": "^6.6.0",
     "dayjs": "^1.11.19",
     "gray-matter": "^4.0.3",
-    "js-yaml": "^4.1.1",
+    "js-yaml": "^5.0.0",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-to-markdown": "^2.1.2",
