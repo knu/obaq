@@ -23,10 +23,7 @@ export interface View {
 }
 
 export type Filter =
-  | string
-  | { and: Filter[] }
-  | { or: Filter[] }
-  | { not: Filter[] };
+  string | { and: Filter[] } | { or: Filter[] } | { not: Filter[] };
 
 export interface SortConfig {
   property: string;
