@@ -144,13 +144,7 @@ function getFileIdentity(
 }
 
 export type DurationUnit =
-  | "year"
-  | "month"
-  | "week"
-  | "day"
-  | "hour"
-  | "minute"
-  | "second";
+  "year" | "month" | "week" | "day" | "hour" | "minute" | "second";
 
 export class Duration {
   constructor(
