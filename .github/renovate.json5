@@ -12,10 +12,9 @@
   npm: {
     minimumReleaseAge: "3 days",
   },
+  // Lockfiles are maintained by lockfile-maintenance-action.
   lockFileMaintenance: {
-    enabled: true,
-    labels: ["dependencies"],
-    schedule: ["after 9am on friday", "before 6pm on friday"],
+    enabled: false,
   },
   vulnerabilityAlerts: {
     enabled: true,

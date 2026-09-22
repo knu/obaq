@@ -1,0 +1,30 @@
+name: Lockfile maintenance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 5" # Friday 09:00 JST
+
+concurrency:
+  group: lockfile-maintenance
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: knu/lockfile-maintenance-action@v1 # zizmor: ignore[unpinned-uses] -- Follow the tested v1 release series.
+        with:
+          auth: oidc
+          files: /package-lock.json
+          minimum-release-age: 3 days
